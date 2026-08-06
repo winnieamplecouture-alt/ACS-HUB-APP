@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
-  Shirt,
+  Users,
   Calendar,
   BarChart3,
   Award,
@@ -11,7 +11,7 @@ import {
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/designs", label: "Designs", icon: Shirt },
+  { to: "/customers", label: "Customers", icon: Users },
   { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/best-practice", label: "Best Practice", icon: Award },
@@ -50,11 +50,11 @@ export default function Sidebar() {
 
       <div className="flex items-center gap-3 border-t border-gray-100 px-4 py-4">
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold text-gray-600">
-          T
+          W
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-900">Tammy</p>
-          <p className="truncate text-xs text-gray-500">Custom Studio</p>
+          <p className="truncate text-sm font-medium text-gray-900">Winnie</p>
+          <p className="truncate text-xs text-gray-500">AC Customisation</p>
         </div>
         <ChevronDown size={16} className="text-gray-400" />
       </div>
