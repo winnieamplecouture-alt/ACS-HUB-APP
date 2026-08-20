@@ -1,5 +1,10 @@
-// Real customer data transcribed from the ACS Customization tracker
-// (Google Sheet, "ACS Customization" tab, provided by the user 2026-08-06).
+// Real design records from the ACS Customization Design Record tracker
+// (Google Sheet, "AR" + "P" tabs, provided by the user 2026-08-06): 44
+// designs (CDS1.1-CDS1.44) across 11 customers, with their real category
+// and current pre-production remark. None have reached CLO3D/Deposit/
+// Production in that tracker yet, so every design starts "Not Started"
+// here too — the 30-day clock below is this app's own, separate from the
+// tracker's granular D.S/F.S/Quotation/Deposit/CLO3D checkpoints.
 //
 // V1 scope (per the user's product spec, 2026-08-06): one purpose — help
 // the team see which designs are on track, at risk, or behind, and what
@@ -23,122 +28,52 @@ export const DESIGN_MILESTONES = [
 
 export const DELAY_REASONS = ["Customer", "Supplier", "Factory", "Internal", "Other"];
 
-export const RAW_CUSTOMERS = [
-  {
-    orderId: "AC704791",
-    name: "Lau Yoke Foong",
-    pic: "Winnie",
-    designs: ["2-piece gown", "2-piece set (Halter cream)", "Blazer dress set", "Denim dress with kimono belt"],
-  },
-  {
-    orderId: "AC708336",
-    name: "Ngaw Yin Yin",
-    pic: null,
-    designs: ["Embroidery 2-piece set gown", "CNY 3-piece set", "Minimal Batik 2-piece set"],
-  },
-  {
-    orderId: "AC708363",
-    name: "Eileen Chong",
-    pic: "Winnie",
-    designs: ["Couture dress"],
-  },
-  {
-    orderId: "AC708378",
-    name: "Jacqueline Lim Sweet Chuen",
-    pic: "Winnie",
-    designs: [
-      "Formal Men's Shirt",
-      "Denim dress",
-      "Casual woman shirt (longsleeve)",
-      "Casual woman sleeve (shortsleeve)",
-      "Lace long dress",
-    ],
-  },
-  {
-    orderId: "AC709889",
-    name: "Chrissie Mulyani Tamara",
-    pic: null,
-    designs: [],
-  },
-  {
-    orderId: "AC711105",
-    name: "Gigi Lee Daphne Tai",
-    pic: "Winnie",
-    designs: [
-      "Denim Lace 2-piece set",
-      "Jumpsuit with cotton belt",
-      "Business casual 2-piece set",
-      "Brocade short dress",
-      "Lace 2-piece set",
-      "Halter lace dress",
-      "Denim Gradient 2-piece set",
-      "Kebaya 2-piece set",
-    ],
-  },
-  {
-    orderId: "AC-DAISY",
-    name: "Daisy",
-    pic: "Winnie",
-    designs: [
-      "Black Lace Dress",
-      "Kebaya 2-Piece Set",
-      "AC234 Jumpsuit",
-      "Pants (AC015)",
-      "Blazer & Dress",
-      "Lace Blazer Set",
-      "Blue Elegant Set",
-      "Yellow Flowy Dress",
-    ],
-  },
-  {
-    orderId: "AC710836",
-    name: "Triny",
-    pic: "Jocelyn",
-    designs: [
-      "Lace dress",
-      "Jumpsuit",
-      "Batik 2-Piece Set",
-      "Denim 2-piece set",
-      "Family Lace 3-Piece Set (Husband + Child)",
-      "Cargo pants",
-      "Lace skirt",
-    ],
-  },
-  {
-    orderId: "AC714321",
-    name: "MS",
-    pic: null,
-    designs: [],
-  },
-  {
-    orderId: "AC724948",
-    name: "Cheryl",
-    pic: null,
-    designs: ["Pilates outerwear"],
-  },
-  {
-    orderId: "AC742773",
-    name: "Ann Gie",
-    pic: null,
-    designs: ["2-piece set Navy Jumpsuit", "2-piece set Lightblue Jumpsuit"],
-  },
+export const BASE_DESIGNS = [
+  { id: "CDS1.1", name: "Butterfly Gown 2-Piece Set (Top+Skirt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "High End", remark: "Fabric sourcing china (order china)", timeline: null },
+  { id: "CDS1.2", name: "Elegant Halter 2-Piece Set (Top+Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Fabric sourcing", timeline: null },
+  { id: "CDS1.3", name: "Blazer Dress 2-Piece Set (Dress + Short Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing (RM13 per meter)", timeline: null },
+  { id: "CDS1.4", name: "Blazer Set with Kimono Belt 3-Piece Set (Top+Skirt+Belt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.5", name: "Sleeveless Lace Maxi Dress", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.6", name: "Batik Lace Set 2-Piece Set (Top+Skirt)", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.7", name: "Denim Halter Top & Asymmetrical Skort (Top+Skort)", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.8", name: "Pink Couture 2-Piece Set (Top + Skirt)", customer: "Eileen Choong", pic: "Winnie", category: "Couture", remark: "Can start fabric sourcing — patchwork local (RM35), china (7-8 days), border lace (1m 13rm)", timeline: null },
+  { id: "CDS1.9", name: "Denim Lace Top", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.10", name: "Elegant Casual Jumpsuit + Braided Belt", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.11", name: "Business Casual Set 2-Piece Set (Top+Shorts)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.12", name: "Brocade Short Dress", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.13", name: "Halter Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Pending customer confirmation & waiting for production team to update", timeline: null },
+  { id: "CDS1.14", name: "Barbie Doll Lace Dress", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.15", name: "Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.16", name: "Denim Gradient 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.17", name: "Kebaya Set", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "On hold", timeline: null },
+  { id: "CDS1.18", name: "Feminine Casual Set / Dress", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Pending customer confirmation & waiting for production team to update", timeline: null },
+  { id: "CDS1.19", name: "Embroidered 2-Piece Set (Top + Skirt)", customer: "Ngaw Yin Yin", pic: null, category: "Couture", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.20", name: "CNY 3-Piece Set (Top + Shorts + Long Skirt)", customer: "Ngaw Yin Yin", pic: null, category: "", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.21", name: "Minimal Batik Top", customer: "Ngaw Yin Yin", pic: null, category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.22", name: "Formal Men's Shirt", customer: "Jacqueline Lim Sweet Chuen", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.23", name: "Denim Dress", customer: "Jacqueline Lim Sweet Chuen", pic: "Winnie", category: "RTW", remark: "Sketch development in progress", timeline: null },
+  { id: "CDS1.24", name: "Casual Women's Shirt (long sleeve)", customer: "Jacqueline Lim Sweet Chuen", pic: "Winnie", category: "RTW", remark: "Sketch development in progress", timeline: null },
+  { id: "CDS1.25", name: "Casual Women's Shirt (short sleeve)", customer: "Jacqueline Lim Sweet Chuen", pic: "Winnie", category: "RTW", remark: "Sketch development in progress", timeline: null },
+  { id: "CDS1.26", name: "Lace Long Dress", customer: "Jacqueline Lim Sweet Chuen", pic: "Winnie", category: "RTW", remark: "Sketch development in progress", timeline: null },
+  { id: "CDS1.27", name: "Black Lace Dress", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.28", name: "Kebaya 2-Piece Set (Top + Skirt)", customer: "Daisy", pic: "Winnie", category: "Couture", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.29", name: "AC234 Jumpsuit", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.30", name: "Pants", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.31", name: "Blazer & Dress", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.32", name: "Lace Blazer Set (Blazer + Trouser)", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.33", name: "Blue Elegant Set (Top + Skirt)", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.34", name: "Yellow Flowy Dress", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.35", name: "Jumpsuit", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.36", name: "Husband & Son Matching Top", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.37", name: "Cargo Pants", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.38", name: "Lace Skirt", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.39", name: "Pilates Outerwear", customer: "Cheryl", pic: null, category: "RTW", remark: "Sketch in progress", timeline: null },
+  { id: "CDS1.40", name: "Duo Colour Pants", customer: "Daisy", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.41", name: "Red Jumpsuit", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.42", name: "Denim Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.43", name: "Beige CNY 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.44", name: "CNY Purple 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
 ];
-
-// Flatten every customer's garments into one list of trackable designs.
-let seq = 0;
-export const BASE_DESIGNS = RAW_CUSTOMERS.flatMap((c) =>
-  c.designs.map((name) => {
-    seq += 1;
-    return {
-      id: `D${String(seq).padStart(3, "0")}`,
-      name,
-      customer: c.name,
-      pic: c.pic,
-      orderId: c.orderId,
-      timeline: null,
-    };
-  })
-);
 
 function startOfDay(d) {
   const x = new Date(d);

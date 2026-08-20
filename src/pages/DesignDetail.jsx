@@ -48,7 +48,10 @@ export default function DesignDetail() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Design {design.id}</h1>
-          <p className="mt-1 text-sm text-gray-500">{design.name}</p>
+          <p className="mt-1 text-sm text-gray-500">
+            {design.name}
+            {design.category && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <StatusPill status={status} />
@@ -56,6 +59,14 @@ export default function DesignDetail() {
             {status.currentDay ? `Day ${status.currentDay} / 30` : "Not started"}
           </span>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+          <Field label="Customer" value={design.customer} />
+          <Field icon={<User size={14} />} label="PIC" value={design.pic ?? "Unassigned"} />
+          {design.remark && <Field label="Remark" value={design.remark} />}
+        </dl>
       </div>
 
       {!design.timeline ? (
@@ -71,13 +82,6 @@ export default function DesignDetail() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
           <div className="space-y-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <dl className="space-y-3 text-sm">
-                <Field label="Customer" value={design.customer} />
-                <Field icon={<User size={14} />} label="PIC" value={design.pic ?? "Unassigned"} />
-              </dl>
-            </div>
-
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-900">Expected Today</h2>
               <p className="text-sm text-gray-700">
