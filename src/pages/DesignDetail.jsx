@@ -142,7 +142,17 @@ export default function DesignDetail() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_280px]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_240px_1fr_280px]">
+          {design.photo ? (
+            <button onClick={() => setLightboxOpen(true)} className="block h-full min-h-[300px] w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <img src={design.photo} alt={design.name} className="h-full w-full object-cover object-top transition hover:opacity-80" />
+            </button>
+          ) : (
+            <div className="flex h-full min-h-[300px] w-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white text-gray-300">
+              <Shirt size={32} />
+            </div>
+          )}
+
           <div className="space-y-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-900">Expected Today</h2>
