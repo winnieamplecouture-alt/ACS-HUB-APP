@@ -88,7 +88,7 @@ export function startDesignTimeline(startDate = new Date()) {
     milestones: DESIGN_MILESTONES.map((m) => {
       const target = new Date(start);
       target.setDate(target.getDate() + (m.day - 1));
-      return { ...m, targetDate: target, done: false, completedDate: null };
+      return { ...m, targetDate: target, done: false, completedDate: null, note: null };
     }),
     delay: null,
   };

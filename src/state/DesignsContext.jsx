@@ -1,6 +1,14 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import { BASE_DESIGNS, startDesignTimeline } from "../data/designs";
 
+function nextDesignId(designs) {
+  const max = designs.reduce((m, d) => {
+    const n = parseInt(d.id.split(".")[1] ?? "0", 10);
+    return n > m ? n : m;
+  }, 0);
+  return `CDS1.${max + 1}`;
+}
+
 const DesignsContext = createContext(null);
 
 export function DesignsProvider({ children }) {
@@ -17,12 +25,12 @@ export function DesignsProvider({ children }) {
         );
       },
 
-      toggleMilestone: (id, day, done, completedDate = new Date()) => {
+      toggleMilestone: (id, day, done, completedDate = new Date(), note = null) => {
         setDesigns((prev) =>
           prev.map((d) => {
             if (d.id !== id || !d.timeline) return d;
             const milestones = d.timeline.milestones.map((m) =>
-              m.day === day ? { ...m, done, completedDate: done ? completedDate : null } : m
+              m.day === day ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null } : m
             );
             return { ...d, timeline: { ...d.timeline, milestones } };
           })
@@ -33,6 +41,15 @@ export function DesignsProvider({ children }) {
         setDesigns((prev) =>
           prev.map((d) => (d.id === id && d.timeline ? { ...d, timeline: { ...d.timeline, delay } } : d))
         );
+      },
+
+      addDesign: (customer, { name, category, remark, pic }) => {
+        let newId;
+        setDesigns((prev) => {
+          newId = nextDesignId(prev);
+          return [...prev, { id: newId, name, customer, pic: pic || null, category: category || "", remark: remark || "", timeline: null }];
+        });
+        return newId;
       },
     }),
     [designs]

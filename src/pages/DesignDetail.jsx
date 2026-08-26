@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check, Shirt } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt, X } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 function toISO(d) {
   return new Date(d).toISOString().slice(0, 10);
+}
+
+function formatShort(d) {
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 export default function DesignDetail() {
@@ -21,6 +25,10 @@ export default function DesignDetail() {
   const [recoveryDate, setRecoveryDate] = useState(design?.timeline?.delay?.recoveryDate ?? "");
   const [startDateInput, setStartDateInput] = useState(toISO(new Date()));
   const [milestoneDates, setMilestoneDates] = useState({});
+  const [pendingDay, setPendingDay] = useState(null);
+  const [pendingDate, setPendingDate] = useState("");
+  const [pendingNote, setPendingNote] = useState("");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (!design) {
     return (
@@ -40,6 +48,24 @@ export default function DesignDetail() {
     setDelay(design.id, { reason, action, pic: delayPic, recoveryDate });
   }
 
+  function openPending(m) {
+    setPendingDay(m.day);
+    setPendingDate(milestoneDates[m.day] ?? toISO(new Date()));
+    setPendingNote(m.note ?? "");
+  }
+
+  function confirmPending(m) {
+    if (!pendingNote.trim()) return;
+    setMilestoneDates((prev) => ({ ...prev, [m.day]: pendingDate }));
+    toggleMilestone(design.id, m.day, true, new Date(pendingDate), pendingNote.trim());
+    setPendingDay(null);
+    setPendingNote("");
+  }
+
+  const bestPracticeEntries = design.timeline
+    ? design.timeline.milestones.filter((m) => m.done && m.note)
+    : [];
+
   return (
     <div className="space-y-5">
       <button onClick={() => navigate("/designs")} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800">
@@ -49,7 +75,9 @@ export default function DesignDetail() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           {design.photo ? (
-            <img src={design.photo} alt={design.name} className="h-16 w-16 shrink-0 rounded-xl border border-gray-200 object-cover" />
+            <button onClick={() => setLightboxOpen(true)} className="shrink-0">
+              <img src={design.photo} alt={design.name} className="h-16 w-16 rounded-xl border border-gray-200 object-cover transition hover:opacity-80" />
+            </button>
           ) : (
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-200 text-gray-300">
               <Shirt size={22} />
@@ -70,6 +98,18 @@ export default function DesignDetail() {
           </span>
         </div>
       </div>
+
+      {lightboxOpen && design.photo && (
+        <div
+          onClick={() => setLightboxOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8"
+        >
+          <button onClick={() => setLightboxOpen(false)} className="absolute right-6 top-6 text-white/80 hover:text-white">
+            <X size={28} />
+          </button>
+          <img src={design.photo} alt={design.name} className="max-h-full max-w-3xl rounded-lg object-contain" />
+        </div>
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-5">
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
@@ -102,7 +142,7 @@ export default function DesignDetail() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_280px]">
           <div className="space-y-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-900">Expected Today</h2>
@@ -117,45 +157,6 @@ export default function DesignDetail() {
               <p className="text-sm text-gray-700">
                 {next ? `Day ${next.day} · ${next.label}` : "All milestones complete"}
               </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <h2 className="mb-4 text-sm font-semibold text-gray-900">Timeline Progress</h2>
-              <p className="mb-4 text-xs text-gray-400">Tick a step when it's done — the date is recorded automatically.</p>
-              <ul className="space-y-3">
-                {design.timeline.milestones.map((m) => {
-                  const dateValue = milestoneDates[m.day] ?? toISO(m.completedDate ?? new Date());
-                  return (
-                    <li key={m.day} className="flex items-center gap-3">
-                      <button
-                        onClick={() => toggleMilestone(design.id, m.day, !m.done, new Date(dateValue))}
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                          m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
-                        }`}
-                      >
-                        {m.done && <Check size={13} />}
-                      </button>
-                      <span className="w-14 shrink-0 text-xs text-gray-400">Day {m.day}</span>
-                      <span className={`flex-1 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>{m.label}</span>
-                      {m.done && (
-                        <input
-                          type="date"
-                          value={dateValue}
-                          max={toISO(new Date())}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setMilestoneDates((prev) => ({ ...prev, [m.day]: v }));
-                            toggleMilestone(design.id, m.day, true, new Date(v));
-                          }}
-                          className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        />
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
             </div>
 
             {status.key === "behind" && (
@@ -187,24 +188,22 @@ export default function DesignDetail() {
                       className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-gray-700">PIC</label>
-                      <input
-                        value={delayPic}
-                        onChange={(e) => setDelayPic(e.target.value)}
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-sm font-medium text-gray-700">Expected Recovery Date</label>
-                      <input
-                        type="date"
-                        value={recoveryDate}
-                        onChange={(e) => setRecoveryDate(e.target.value)}
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      />
-                    </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">PIC</label>
+                    <input
+                      value={delayPic}
+                      onChange={(e) => setDelayPic(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">Expected Recovery Date</label>
+                    <input
+                      type="date"
+                      value={recoveryDate}
+                      onChange={(e) => setRecoveryDate(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
                   </div>
                   <button
                     onClick={saveDelay}
@@ -215,6 +214,123 @@ export default function DesignDetail() {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h2 className="mb-4 text-sm font-semibold text-gray-900">Timeline Progress</h2>
+              <p className="mb-4 text-xs text-gray-400">
+                Tick a step when it's done — you'll be asked for the date and a short best-practice note before it's saved.
+              </p>
+              <ul className="space-y-3">
+                {design.timeline.milestones.map((m) => {
+                  const dateValue = milestoneDates[m.day] ?? toISO(m.completedDate ?? new Date());
+                  const isPending = pendingDay === m.day;
+                  return (
+                    <li key={m.day}>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => (m.done ? toggleMilestone(design.id, m.day, false) : openPending(m))}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                            m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
+                          }`}
+                        >
+                          {m.done && <Check size={13} />}
+                        </button>
+                        <span className="w-14 shrink-0 text-xs text-gray-400">Day {m.day}</span>
+                        <span className={`flex-1 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>{m.label}</span>
+                        {m.done && (
+                          <input
+                            type="date"
+                            value={dateValue}
+                            max={toISO(new Date())}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setMilestoneDates((prev) => ({ ...prev, [m.day]: v }));
+                              toggleMilestone(design.id, m.day, true, new Date(v), m.note);
+                            }}
+                            className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          />
+                        )}
+                      </div>
+                      {isPending && (
+                        <div className="ml-8 mt-2 space-y-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-medium text-gray-600">Date completed</label>
+                            <input
+                              type="date"
+                              value={pendingDate}
+                              max={toISO(new Date())}
+                              onChange={(e) => setPendingDate(e.target.value)}
+                              className="rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                            <span
+                              className={`ml-auto rounded-full px-2 py-0.5 text-xs font-medium ${
+                                pendingDate && pendingDate <= toISO(m.targetDate)
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {pendingDate && pendingDate <= toISO(m.targetDate) ? "🟢 On time" : "🔴 Overdue"}
+                            </span>
+                          </div>
+                          <textarea
+                            value={pendingNote}
+                            onChange={(e) => setPendingNote(e.target.value)}
+                            placeholder="Best-practice note — why on time, or why overdue? (required)"
+                            rows={2}
+                            className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setPendingDay(null)}
+                              className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => confirmPending(m)}
+                              disabled={!pendingNote.trim()}
+                              className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              Mark Done
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h2 className="mb-1 text-sm font-semibold text-gray-900">Best Practice</h2>
+              <p className="mb-4 text-xs text-gray-400">Compulsory note captured each time a step is ticked done.</p>
+              {bestPracticeEntries.length === 0 ? (
+                <p className="text-xs text-gray-400">Nothing recorded yet — tick a step to add the first note.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {bestPracticeEntries.map((m) => {
+                    const onTime = m.completedDate && m.targetDate && toISO(m.completedDate) <= toISO(m.targetDate);
+                    return (
+                      <li key={m.day} className={`rounded-lg border p-3 text-xs ${onTime ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`font-medium ${onTime ? "text-emerald-700" : "text-red-700"}`}>
+                            {onTime ? "🟢 Completed in time" : "🔴 Overdue"}
+                          </span>
+                          <span className="text-gray-400">{formatShort(m.completedDate)}</span>
+                        </div>
+                        <p className="mt-1 text-gray-500">{m.label} (Day {m.day})</p>
+                        <p className="mt-1 text-gray-700">{m.note}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       )}
