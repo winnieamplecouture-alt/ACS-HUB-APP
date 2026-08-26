@@ -29,10 +29,10 @@ export const DESIGN_MILESTONES = [
 export const DELAY_REASONS = ["Customer", "Supplier", "Factory", "Internal", "Other"];
 
 export const BASE_DESIGNS = [
-  { id: "CDS1.1", name: "Butterfly Gown 2-Piece Set (Top+Skirt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "High End", remark: "Fabric sourcing china (order china)", timeline: null },
-  { id: "CDS1.2", name: "Elegant Halter 2-Piece Set (Top+Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Fabric sourcing", timeline: null },
-  { id: "CDS1.3", name: "Blazer Dress 2-Piece Set (Dress + Short Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing (RM13 per meter)", timeline: null },
-  { id: "CDS1.4", name: "Blazer Set with Kimono Belt 3-Piece Set (Top+Skirt+Belt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
+  { id: "CDS1.1", photo: "/design-photos/CDS1.1.jpg", name: "Butterfly Gown 2-Piece Set (Top+Skirt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "High End", remark: "Fabric sourcing china (order china)", timeline: null },
+  { id: "CDS1.2", photo: "/design-photos/CDS1.2.jpg", name: "Elegant Halter 2-Piece Set (Top+Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Fabric sourcing", timeline: null },
+  { id: "CDS1.3", photo: "/design-photos/CDS1.3.jpg", name: "Blazer Dress 2-Piece Set (Dress + Short Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing (RM13 per meter)", timeline: null },
+  { id: "CDS1.4", photo: "/design-photos/CDS1.4.jpg", name: "Blazer Set with Kimono Belt 3-Piece Set (Top+Skirt+Belt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
   { id: "CDS1.5", photo: "/design-photos/CDS1.5.jpg", name: "Sleeveless Lace Maxi Dress", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
   { id: "CDS1.6", photo: "/design-photos/CDS1.6.jpg", name: "Batik Lace Set 2-Piece Set (Top+Skirt)", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
   { id: "CDS1.7", photo: "/design-photos/CDS1.7.jpg", name: "Denim Halter Top & Asymmetrical Skort (Top+Skort)", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
@@ -41,7 +41,7 @@ export const BASE_DESIGNS = [
   { id: "CDS1.10", photo: "/design-photos/CDS1.10.jpg", name: "Elegant Casual Jumpsuit + Braided Belt", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
   { id: "CDS1.11", photo: "/design-photos/CDS1.11.jpg", name: "Business Casual Set 2-Piece Set (Top+Shorts)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Can start fabric sourcing", timeline: null },
   { id: "CDS1.12", photo: "/design-photos/CDS1.12.jpg", name: "Brocade Short Dress", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
-  { id: "CDS1.13", name: "Halter Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Pending customer confirmation & waiting for production team to update", timeline: null },
+  { id: "CDS1.13", photo: "/design-photos/CDS1.13.jpg", name: "Halter Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "Pending customer confirmation & waiting for production team to update", timeline: null },
   { id: "CDS1.14", photo: "/design-photos/CDS1.14.jpg", name: "Barbie Doll Lace Dress", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
   { id: "CDS1.15", photo: "/design-photos/CDS1.15.jpg", name: "Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
   { id: "CDS1.16", photo: "/design-photos/CDS1.16.jpg", name: "Denim Gradient 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
@@ -72,7 +72,7 @@ export const BASE_DESIGNS = [
   { id: "CDS1.41", photo: "/design-photos/CDS1.41.jpg", name: "Red Jumpsuit", customer: "Triny", pic: "Jocelyn", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
   { id: "CDS1.42", photo: "/design-photos/CDS1.42.jpg", name: "Denim Lace 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
   { id: "CDS1.43", photo: "/design-photos/CDS1.43.jpg", name: "Beige CNY 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
-  { id: "CDS1.44", name: "CNY Purple 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
+  { id: "CDS1.44", photo: "/design-photos/CDS1.44.jpg", name: "CNY Purple 2-Piece Set (Top + Skirt)", customer: "Gigi Lee", pic: "Winnie", category: "RTW", remark: "WIP technical sketch + confirm fabric type", timeline: null },
 ];
 
 function startOfDay(d) {
