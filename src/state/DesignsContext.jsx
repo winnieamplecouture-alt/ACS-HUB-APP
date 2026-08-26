@@ -1,5 +1,7 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { BASE_DESIGNS, startDesignTimeline } from "../data/designs";
+
+const STORAGE_KEY = "acs-hub-designs-v1";
 
 function nextDesignId(designs) {
   const max = designs.reduce((m, d) => {
@@ -9,10 +11,50 @@ function nextDesignId(designs) {
   return `CDS1.${max + 1}`;
 }
 
+function reviveMilestone(m) {
+  return {
+    ...m,
+    targetDate: m.targetDate ? new Date(m.targetDate) : null,
+    completedDate: m.completedDate ? new Date(m.completedDate) : null,
+  };
+}
+
+function reviveDesigns(designs) {
+  return designs.map((d) => {
+    if (!d.timeline) return d;
+    return {
+      ...d,
+      timeline: {
+        ...d.timeline,
+        startDate: new Date(d.timeline.startDate),
+        milestones: d.timeline.milestones.map(reviveMilestone),
+      },
+    };
+  });
+}
+
+function loadInitialDesigns() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return BASE_DESIGNS;
+    return reviveDesigns(JSON.parse(raw));
+  } catch {
+    return BASE_DESIGNS;
+  }
+}
+
 const DesignsContext = createContext(null);
 
 export function DesignsProvider({ children }) {
-  const [designs, setDesigns] = useState(BASE_DESIGNS);
+  const [designs, setDesigns] = useState(loadInitialDesigns);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(designs));
+    } catch {
+      // storage full or unavailable — edits still work for this session
+    }
+  }, [designs]);
 
   const value = useMemo(
     () => ({
@@ -50,6 +92,20 @@ export function DesignsProvider({ children }) {
           return [...prev, { id: newId, name, customer, pic: pic || null, category: category || "", remark: remark || "", timeline: null }];
         });
         return newId;
+      },
+
+      updateDesign: (id, patch) => {
+        setDesigns((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+      },
+
+      renameDesignId: (oldId, newId) => {
+        const trimmed = newId.trim();
+        if (!trimmed || trimmed === oldId) return { ok: false, error: null };
+        if (designs.some((d) => d.id === trimmed)) {
+          return { ok: false, error: `${trimmed} is already in use by another design.` };
+        }
+        setDesigns((prev) => prev.map((d) => (d.id === oldId ? { ...d, id: trimmed } : d)));
+        return { ok: true, error: null };
       },
     }),
     [designs]

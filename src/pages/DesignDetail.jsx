@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check, Shirt, X } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
@@ -13,10 +13,40 @@ function formatShort(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
+function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not read image"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getDesign, startTimeline, toggleMilestone, setDelay } = useDesigns();
+  const { getDesign, startTimeline, toggleMilestone, setDelay, updateDesign, renameDesignId } = useDesigns();
   const design = getDesign(id);
 
   const [reason, setReason] = useState(design?.timeline?.delay?.reason ?? DELAY_REASONS[0]);
@@ -29,6 +59,13 @@ export default function DesignDetail() {
   const [pendingDate, setPendingDate] = useState("");
   const [pendingNote, setPendingNote] = useState("");
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [editingId, setEditingId] = useState(false);
+  const [idInput, setIdInput] = useState(design?.id ?? "");
+  const [idError, setIdError] = useState("");
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [customerInput, setCustomerInput] = useState(design?.customer ?? "");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   if (!design) {
     return (
@@ -62,6 +99,52 @@ export default function DesignDetail() {
     setPendingNote("");
   }
 
+  function startEditId() {
+    setIdInput(design.id);
+    setIdError("");
+    setEditingId(true);
+  }
+
+  function saveId() {
+    const trimmed = idInput.trim();
+    if (!trimmed || trimmed === design.id) {
+      setEditingId(false);
+      return;
+    }
+    const result = renameDesignId(design.id, trimmed);
+    if (!result.ok) {
+      setIdError(result.error ?? "Couldn't rename.");
+      return;
+    }
+    setEditingId(false);
+    navigate(`/designs/${trimmed}`, { replace: true });
+  }
+
+  function startEditCustomer() {
+    setCustomerInput(design.customer);
+    setEditingCustomer(true);
+  }
+
+  function saveCustomer() {
+    if (customerInput.trim()) {
+      updateDesign(design.id, { customer: customerInput.trim() });
+    }
+    setEditingCustomer(false);
+  }
+
+  async function handlePhotoFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      updateDesign(design.id, { photo: dataUrl });
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
   const bestPracticeEntries = design.timeline
     ? design.timeline.milestones.filter((m) => m.done && m.note)
     : [];
@@ -84,7 +167,40 @@ export default function DesignDetail() {
             </span>
           )}
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Design {design.id}</h1>
+            {editingId ? (
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-semibold text-gray-900">Design</span>
+                  <input
+                    autoFocus
+                    value={idInput}
+                    onChange={(e) => {
+                      setIdInput(e.target.value);
+                      setIdError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveId();
+                      if (e.key === "Escape") setEditingId(false);
+                    }}
+                    className="rounded-lg border border-gray-300 px-2 py-0.5 text-2xl font-semibold text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <button onClick={saveId} className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingId(false)} className="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+                {idError && <p className="mt-1 text-xs text-red-600">{idError}</p>}
+              </div>
+            ) : (
+              <h1 className="group flex items-center gap-1.5 text-2xl font-semibold text-gray-900">
+                Design {design.id}
+                <button onClick={startEditId} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={14} />
+                </button>
+              </h1>
+            )}
             <p className="mt-1 text-sm text-gray-500">
               {design.name}
               {design.category && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
@@ -113,46 +229,92 @@ export default function DesignDetail() {
 
       <div className="rounded-xl border border-gray-200 bg-white p-5">
         <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
-          <Field label="Customer" value={design.customer} />
+          <div>
+            <dt className="text-xs text-gray-400">Customer</dt>
+            {editingCustomer ? (
+              <div className="mt-0.5 flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={customerInput}
+                  onChange={(e) => setCustomerInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveCustomer();
+                    if (e.key === "Escape") setEditingCustomer(false);
+                  }}
+                  className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <button onClick={saveCustomer} className="shrink-0 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                  Save
+                </button>
+                <button onClick={() => setEditingCustomer(false)} className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <dd className="group mt-0.5 flex items-center gap-1.5 font-medium text-gray-800">
+                {design.customer}
+                <button onClick={startEditCustomer} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </dd>
+            )}
+            <p className="mt-1 text-[11px] text-gray-400">Wrong customer? Edit here and it moves to the right group in the Designs list.</p>
+          </div>
           <Field icon={<User size={14} />} label="PIC" value={design.pic ?? "Unassigned"} />
           {design.remark && <Field label="Remark" value={design.remark} />}
         </dl>
       </div>
 
-      {!design.timeline ? (
-        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center">
-          <p className="text-sm text-gray-500">This design hasn't started its 30-day timeline yet.</p>
-          <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
-            If work already started earlier, set the real start date — Day 1 and every target date will be calculated from it.
-          </p>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <input
-              type="date"
-              value={startDateInput}
-              onChange={(e) => setStartDateInput(e.target.value)}
-              max={toISO(new Date())}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            />
-            <button
-              onClick={() => startTimeline(design.id, new Date(startDateInput))}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Start 30-Day Timeline
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[220px_240px_1fr_280px]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="relative w-full shrink-0 lg:w-[220px]">
           {design.photo ? (
             <button onClick={() => setLightboxOpen(true)} className="block h-full min-h-[300px] w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
               <img src={design.photo} alt={design.name} className="h-full w-full object-cover object-top transition hover:opacity-80" />
             </button>
           ) : (
-            <div className="flex h-full min-h-[300px] w-full items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white text-gray-300">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-white text-gray-300 hover:border-gray-300 hover:text-gray-400"
+            >
               <Shirt size={32} />
-            </div>
+              <span className="text-xs font-medium">Upload Photo</span>
+            </button>
           )}
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoFile} className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={photoUploading}
+            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-xs font-medium text-gray-700 shadow hover:bg-white disabled:opacity-50"
+          >
+            <Upload size={12} /> {photoUploading ? "Uploading…" : design.photo ? "Change" : "Upload"}
+          </button>
+        </div>
 
+        <div className="min-w-0 flex-1">
+          {!design.timeline ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center">
+              <p className="text-sm text-gray-500">This design hasn't started its 30-day timeline yet.</p>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
+                If work already started earlier, set the real start date — Day 1 and every target date will be calculated from it.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <input
+                  type="date"
+                  value={startDateInput}
+                  onChange={(e) => setStartDateInput(e.target.value)}
+                  max={toISO(new Date())}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <button
+                  onClick={() => startTimeline(design.id, new Date(startDateInput))}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Start 30-Day Timeline
+                </button>
+              </div>
+            </div>
+          ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr_280px]">
           <div className="space-y-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-gray-900">Expected Today</h2>
@@ -343,7 +505,9 @@ export default function DesignDetail() {
             </div>
           </div>
         </div>
-      )}
+          )}
+        </div>
+      </div>
     </div>
   );
 }
