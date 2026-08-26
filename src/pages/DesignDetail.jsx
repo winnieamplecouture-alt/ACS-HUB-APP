@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
-function formatDate(d) {
-  if (!d) return null;
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function toISO(d) {
+  return new Date(d).toISOString().slice(0, 10);
 }
 
 export default function DesignDetail() {
@@ -20,6 +19,8 @@ export default function DesignDetail() {
   const [action, setAction] = useState(design?.timeline?.delay?.action ?? "");
   const [delayPic, setDelayPic] = useState(design?.timeline?.delay?.pic ?? design?.pic ?? "");
   const [recoveryDate, setRecoveryDate] = useState(design?.timeline?.delay?.recoveryDate ?? "");
+  const [startDateInput, setStartDateInput] = useState(toISO(new Date()));
+  const [milestoneDates, setMilestoneDates] = useState({});
 
   if (!design) {
     return (
@@ -46,12 +47,21 @@ export default function DesignDetail() {
       </button>
 
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Design {design.id}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {design.name}
-            {design.category && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
-          </p>
+        <div className="flex items-center gap-4">
+          {design.photo ? (
+            <img src={design.photo} alt={design.name} className="h-16 w-16 shrink-0 rounded-xl border border-gray-200 object-cover" />
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-200 text-gray-300">
+              <Shirt size={22} />
+            </span>
+          )}
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Design {design.id}</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {design.name}
+              {design.category && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <StatusPill status={status} />
@@ -72,12 +82,24 @@ export default function DesignDetail() {
       {!design.timeline ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center">
           <p className="text-sm text-gray-500">This design hasn't started its 30-day timeline yet.</p>
-          <button
-            onClick={() => startTimeline(design.id)}
-            className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Start 30-Day Timeline
-          </button>
+          <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
+            If work already started earlier, set the real start date — Day 1 and every target date will be calculated from it.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <input
+              type="date"
+              value={startDateInput}
+              onChange={(e) => setStartDateInput(e.target.value)}
+              max={toISO(new Date())}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <button
+              onClick={() => startTimeline(design.id, new Date(startDateInput))}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Start 30-Day Timeline
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
@@ -103,23 +125,36 @@ export default function DesignDetail() {
               <h2 className="mb-4 text-sm font-semibold text-gray-900">Timeline Progress</h2>
               <p className="mb-4 text-xs text-gray-400">Tick a step when it's done — the date is recorded automatically.</p>
               <ul className="space-y-3">
-                {design.timeline.milestones.map((m) => (
-                  <li key={m.day} className="flex items-center gap-3">
-                    <button
-                      onClick={() => toggleMilestone(design.id, m.day, !m.done)}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                        m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
-                      }`}
-                    >
-                      {m.done && <Check size={13} />}
-                    </button>
-                    <span className="w-14 shrink-0 text-xs text-gray-400">Day {m.day}</span>
-                    <span className={`flex-1 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>{m.label}</span>
-                    {m.done && m.completedDate && (
-                      <span className="shrink-0 text-xs text-emerald-600">{formatDate(m.completedDate)}</span>
-                    )}
-                  </li>
-                ))}
+                {design.timeline.milestones.map((m) => {
+                  const dateValue = milestoneDates[m.day] ?? toISO(m.completedDate ?? new Date());
+                  return (
+                    <li key={m.day} className="flex items-center gap-3">
+                      <button
+                        onClick={() => toggleMilestone(design.id, m.day, !m.done, new Date(dateValue))}
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                          m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
+                        }`}
+                      >
+                        {m.done && <Check size={13} />}
+                      </button>
+                      <span className="w-14 shrink-0 text-xs text-gray-400">Day {m.day}</span>
+                      <span className={`flex-1 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>{m.label}</span>
+                      {m.done && (
+                        <input
+                          type="date"
+                          value={dateValue}
+                          max={toISO(new Date())}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setMilestoneDates((prev) => ({ ...prev, [m.day]: v }));
+                            toggleMilestone(design.id, m.day, true, new Date(v));
+                          }}
+                          className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 

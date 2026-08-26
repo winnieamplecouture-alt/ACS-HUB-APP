@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Eye } from "lucide-react";
+import { Search, Eye, Shirt } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { designStatus } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
@@ -82,8 +82,19 @@ export default function Designs() {
             {filtered.map(({ d, status }) => (
               <tr key={d.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
                 <td className="px-5 py-3">
-                  <p className="font-medium text-gray-900">{d.id}</p>
-                  <p className="text-xs text-gray-400">{d.name}</p>
+                  <div className="flex items-center gap-3">
+                    {d.photo ? (
+                      <img src={d.photo} alt={d.name} className="h-10 w-10 shrink-0 rounded-lg border border-gray-200 object-cover" />
+                    ) : (
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 text-gray-300">
+                        <Shirt size={16} />
+                      </span>
+                    )}
+                    <div>
+                      <p className="font-medium text-gray-900">{d.id}</p>
+                      <p className="text-xs text-gray-400">{d.name}</p>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-5 py-3 text-gray-700">{d.customer}</td>
                 <td className="px-5 py-3 text-gray-500">{status.currentDay ? `Day ${status.currentDay} / 30` : "–"}</td>
