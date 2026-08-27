@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
+import { totalDays } from "../data/timelineTemplates";
 import { useDesigns } from "../state/DesignsContext";
 
 function toISO(d) {
@@ -46,7 +47,7 @@ function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
 export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getDesign, startTimeline, toggleMilestone, setDelay, updateDesign, renameDesignId } = useDesigns();
+  const { getDesign, startTimeline, toggleMilestone, setDelay, updateDesign, renameDesignId, templateForDesign } = useDesigns();
   const design = getDesign(id);
 
   const [reason, setReason] = useState(design?.timeline?.delay?.reason ?? DELAY_REASONS[0]);
@@ -80,6 +81,9 @@ export default function DesignDetail() {
 
   const status = designStatus(design);
   const { expected, next } = expectedVsActual(design);
+  const previewTemplate = templateForDesign(design);
+  const previewTotalDays = totalDays(previewTemplate.stages);
+  const totalDaysForDesign = design.timeline ? design.timeline.milestones.at(-1)?.day ?? previewTotalDays : previewTotalDays;
 
   function saveDelay() {
     setDelay(design.id, { reason, action, pic: delayPic, recoveryDate });
@@ -201,16 +205,25 @@ export default function DesignDetail() {
                 </button>
               </h1>
             )}
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 flex items-center gap-2 text-sm text-gray-500">
               {design.name}
-              {design.category && <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
+              {design.category && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
+              <button
+                onClick={() => updateDesign(design.id, { urgent: !design.urgent })}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition ${
+                  design.urgent ? "bg-red-100 text-red-700" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                }`}
+              >
+                <Zap size={11} />
+                {design.urgent ? "Urgent" : "Mark Urgent"}
+              </button>
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <StatusPill status={status} />
           <span className="text-sm font-medium text-gray-500">
-            {status.currentDay ? `Day ${status.currentDay} / 30` : "Not started"}
+            {status.currentDay ? `Day ${status.currentDay} / ${totalDaysForDesign}` : "Not started"}
           </span>
         </div>
       </div>
@@ -293,7 +306,12 @@ export default function DesignDetail() {
         <div className="min-w-0 flex-1">
           {!design.timeline ? (
             <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center">
-              <p className="text-sm text-gray-500">This design hasn't started its 30-day timeline yet.</p>
+              <p className="text-sm text-gray-500">This design hasn't started its timeline yet.</p>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
+                It'll follow the <span className="font-medium text-gray-600">{previewTemplate.label}</span> timeline ({previewTotalDays} days) —{" "}
+                {design.urgent ? "marked Urgent above." : "change its Category, or mark it Urgent above, to use a different one."} Edit stage durations
+                in Settings.
+              </p>
               <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
                 If work already started earlier, set the real start date — Day 1 and every target date will be calculated from it.
               </p>
@@ -309,7 +327,7 @@ export default function DesignDetail() {
                   onClick={() => startTimeline(design.id, new Date(startDateInput))}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  Start 30-Day Timeline
+                  Start {previewTotalDays}-Day Timeline
                 </button>
               </div>
             </div>

@@ -81,11 +81,11 @@ function startOfDay(d) {
   return x;
 }
 
-export function startDesignTimeline(startDate = new Date()) {
+export function startDesignTimeline(startDate = new Date(), milestoneDefs = DESIGN_MILESTONES) {
   const start = startOfDay(startDate);
   return {
     startDate: start,
-    milestones: DESIGN_MILESTONES.map((m) => {
+    milestones: milestoneDefs.map((m) => {
       const target = new Date(start);
       target.setDate(target.getDate() + (m.day - 1));
       return { ...m, targetDate: target, done: false, completedDate: null, note: null };

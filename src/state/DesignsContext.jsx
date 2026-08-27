@@ -1,7 +1,21 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { BASE_DESIGNS, startDesignTimeline } from "../data/designs";
+import { DEFAULT_TIMELINE_TEMPLATES, stagesToMilestones, templateKeyForDesign } from "../data/timelineTemplates";
 
 const STORAGE_KEY = "acs-hub-designs-v1";
+const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v1";
+
+function loadInitialTemplates() {
+  try {
+    const raw = localStorage.getItem(TEMPLATES_STORAGE_KEY);
+    if (!raw) return DEFAULT_TIMELINE_TEMPLATES;
+    const parsed = JSON.parse(raw);
+    // merge over defaults so a template added in a later app version isn't lost
+    return { ...DEFAULT_TIMELINE_TEMPLATES, ...parsed };
+  } catch {
+    return DEFAULT_TIMELINE_TEMPLATES;
+  }
+}
 
 function nextDesignId(designs) {
   const max = designs.reduce((m, d) => {
@@ -47,6 +61,7 @@ const DesignsContext = createContext(null);
 
 export function DesignsProvider({ children }) {
   const [designs, setDesigns] = useState(loadInitialDesigns);
+  const [templates, setTemplates] = useState(loadInitialTemplates);
 
   useEffect(() => {
     try {
@@ -56,15 +71,41 @@ export function DesignsProvider({ children }) {
     }
   }, [designs]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
+    } catch {
+      // storage full or unavailable — edits still work for this session
+    }
+  }, [templates]);
+
   const value = useMemo(
     () => ({
       designs,
+      templates,
       getDesign: (id) => designs.find((d) => d.id === id),
+
+      templateForDesign: (design) => templates[templateKeyForDesign(design)],
 
       startTimeline: (id, startDate = new Date()) => {
         setDesigns((prev) =>
-          prev.map((d) => (d.id === id ? { ...d, timeline: startDesignTimeline(startDate) } : d))
+          prev.map((d) => {
+            if (d.id !== id) return d;
+            const template = templates[templateKeyForDesign(d)];
+            const milestoneDefs = stagesToMilestones(template.stages);
+            return { ...d, timeline: startDesignTimeline(startDate, milestoneDefs) };
+          })
         );
+      },
+
+      setStageDays: (templateKey, stageKey, days) => {
+        setTemplates((prev) => ({
+          ...prev,
+          [templateKey]: {
+            ...prev[templateKey],
+            stages: prev[templateKey].stages.map((s) => (s.key === stageKey ? { ...s, days: Math.max(0, Number(days) || 0) } : s)),
+          },
+        }));
       },
 
       toggleMilestone: (id, day, done, completedDate = new Date(), note = null) => {
@@ -108,7 +149,7 @@ export function DesignsProvider({ children }) {
         return { ok: true, error: null };
       },
     }),
-    [designs]
+    [designs, templates]
   );
 
   return <DesignsContext.Provider value={value}>{children}</DesignsContext.Provider>;

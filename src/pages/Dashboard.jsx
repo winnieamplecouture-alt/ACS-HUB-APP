@@ -32,7 +32,7 @@ export default function Dashboard() {
         <StatCard label="In Progress" value={inProgress.length} tint="amber" icon={<Clock size={18} className="text-amber-500" />} />
         <StatCard label="Behind Schedule" value={behind.length} tint="red" icon={<AlertTriangle size={18} className="text-red-500" />} />
         <StatCard
-          label="30-Day Success Rate"
+          label="On-Time Success Rate"
           value={successRate === null ? "–" : `${successRate}%`}
           sub={successRate === null ? "No designs completed yet" : "Completed without delay"}
           tint="purple"
@@ -56,7 +56,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-900">{d.id}</span>
                 <span className="text-sm text-gray-600">{d.customer}</span>
-                <span className="text-sm text-gray-500">Day {status.currentDay} / 30</span>
+                <span className="text-sm text-gray-500">Day {status.currentDay} / {d.timeline.milestones.at(-1)?.day}</span>
               </div>
               <span className="text-sm font-medium text-red-600">
                 Next: {status.nextMilestone.label} (Day {status.nextMilestone.day})

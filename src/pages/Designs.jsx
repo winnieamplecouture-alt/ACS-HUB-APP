@@ -200,7 +200,9 @@ export default function Designs() {
                         </Link>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-gray-500">{status.currentDay ? `Day ${status.currentDay} / 30` : "–"}</td>
+                    <td className="px-5 py-3 text-gray-500">
+                      {status.currentDay ? `Day ${status.currentDay} / ${d.timeline.milestones.at(-1)?.day}` : "–"}
+                    </td>
                     <td className="px-5 py-3">
                       <StatusPill status={status} />
                     </td>
