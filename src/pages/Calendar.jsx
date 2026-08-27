@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
-import { designStatus } from "../data/designs";
+import { designStatus, withTargetDates } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -36,7 +36,7 @@ export default function CalendarPage() {
     const withNext = [];
     for (const d of designs) {
       if (!d.timeline) continue;
-      const next = d.timeline.milestones.find((m) => !m.done);
+      const next = withTargetDates(d).find((m) => !m.done);
       if (!next) continue;
       withNext.push({ design: d, milestone: next, status: designStatus(d) });
     }
@@ -128,7 +128,7 @@ export default function CalendarPage() {
           <div className="mt-3 space-y-1.5">
             {needsAttention.slice(0, 6).map(({ design, milestone, status }) => (
               <Link
-                key={design.id}
+                key={design.uid}
                 to={`/designs/${design.id}`}
                 className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm hover:opacity-80 ${PILL_STYLE[status.key]}`}
               >
@@ -174,7 +174,7 @@ export default function CalendarPage() {
                 <div className="mt-1 space-y-1">
                   {dayEntries.slice(0, 3).map(({ design, milestone, status }) => (
                     <Link
-                      key={design.id}
+                      key={design.uid}
                       to={`/designs/${design.id}`}
                       className="flex items-center gap-1 truncate rounded-md px-1 py-0.5 text-[11px] font-medium hover:opacity-80"
                       title={`${design.id} · ${milestone.label}`}

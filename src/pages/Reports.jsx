@@ -40,10 +40,14 @@ export default function Reports() {
         <h2 className="mb-3 text-base font-semibold text-gray-900">Need Discussion</h2>
         <div className="divide-y divide-gray-50">
           {needDiscussion.map(({ d, status }) => {
-            const lateDays = status.key === "behind" ? status.currentDay - status.nextMilestone.day : null;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const dueDay = new Date(status.nextMilestone.targetDate);
+            dueDay.setHours(0, 0, 0, 0);
+            const lateDays = status.key === "behind" ? Math.round((today - dueDay) / 86400000) : null;
             const delay = d.timeline?.delay;
             return (
-              <Link key={d.id} to={`/designs/${d.id}`} className="flex items-center justify-between gap-4 py-3 text-sm hover:bg-gray-50/60">
+              <Link key={d.uid} to={`/designs/${d.id}`} className="flex items-center justify-between gap-4 py-3 text-sm hover:bg-gray-50/60">
                 <div className="flex min-w-0 items-center gap-4">
                   <span className="shrink-0 font-medium text-gray-900">{d.id}</span>
                   <span className="shrink-0 text-gray-500">{d.customer}</span>

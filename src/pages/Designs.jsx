@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Search, Eye, Shirt, Plus, X, Trash2, RotateCcw } from "lucide-react";
 import StatusPill from "../components/StatusPill";
-import { designStatus, CATEGORIES } from "../data/designs";
+import { designStatus, totalTimelineDays, CATEGORIES } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 const TABS = [
@@ -16,8 +16,12 @@ const TABS = [
 
 const emptyForm = { name: "", category: "", remark: "", pic: "" };
 
+function formatShort(d) {
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 export default function Designs() {
-  const { designs, addDesign, deleteDesign, deletedDesigns, restoreDesign } = useDesigns();
+  const { designs, addDesign, deleteDesign, deletedDesigns, restoreDesign, templateForDesign } = useDesigns();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
@@ -264,7 +268,7 @@ export default function Designs() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-gray-500">
-                      {status.currentDay ? `Day ${status.currentDay} / ${d.timeline.milestones.at(-1)?.day}` : "–"}
+                      {status.currentDay ? `Day ${status.currentDay} / ${totalTimelineDays(d)}` : "–"}
                     </td>
                     <td className="px-5 py-3">
                       <StatusPill status={status} />
@@ -273,8 +277,8 @@ export default function Designs() {
                       {status.key === "completed"
                         ? "Delivered"
                         : status.key === "not_started"
-                          ? "Day 1 · Order Confirmed"
-                          : `${status.nextMilestone.label} (Day ${status.nextMilestone.day})`}
+                          ? templateForDesign(d).stages[0].label
+                          : `${status.nextMilestone.label} (Due ${formatShort(status.nextMilestone.targetDate)})`}
                     </td>
                     <td className="px-5 py-3 text-gray-700">{d.pic ?? <span className="text-gray-400">Unassigned</span>}</td>
                     <td className="px-5 py-3">

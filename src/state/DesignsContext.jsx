@@ -104,9 +104,20 @@ function nextDesignId(designs) {
 function reviveMilestone(m) {
   return {
     ...m,
-    targetDate: m.targetDate ? new Date(m.targetDate) : null,
     completedDate: m.completedDate ? new Date(m.completedDate) : null,
   };
+}
+
+// Migrate milestones saved before due dates became rolling (they carried a
+// fixed cumulative `day` instead of each stage's own `days` length).
+function migrateMilestoneDays(milestones) {
+  let prevDay = 0;
+  return milestones.map((m) => {
+    if (m.days !== undefined) return m;
+    const days = Math.max((m.day ?? prevDay) - prevDay, 0);
+    prevDay = m.day ?? prevDay;
+    return { ...m, days };
+  });
 }
 
 function reviveDesign(d) {
@@ -116,7 +127,7 @@ function reviveDesign(d) {
     timeline: {
       ...d.timeline,
       startDate: new Date(d.timeline.startDate),
-      milestones: d.timeline.milestones.map(reviveMilestone),
+      milestones: migrateMilestoneDays(d.timeline.milestones).map(reviveMilestone),
     },
   };
 }
@@ -224,12 +235,12 @@ export function DesignsProvider({ children }) {
         }));
       },
 
-      toggleMilestone: (uid, day, done, completedDate = new Date(), note = null) => {
+      toggleMilestone: (uid, index, done, completedDate = new Date(), note = null) => {
         setDesigns((prev) =>
           prev.map((d) => {
             if (d.uid !== uid || !d.timeline) return d;
-            const milestones = d.timeline.milestones.map((m) =>
-              m.day === day ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null } : m
+            const milestones = d.timeline.milestones.map((m, i) =>
+              i === index ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null } : m
             );
             return { ...d, timeline: { ...d.timeline, milestones } };
           })

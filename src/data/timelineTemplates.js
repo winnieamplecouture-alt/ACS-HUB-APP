@@ -40,14 +40,11 @@ export function totalDays(stages) {
   return stages.reduce((sum, s) => sum + (Number(s.days) || 0), 0);
 }
 
-// Cumulative day-count milestones from a stage list, e.g. 4/10/19/7 days
-// becomes checkpoints at day 4, 14, 33, 40.
+// Each stage's own day-length, carried through as-is — due dates get
+// calculated later from when the previous stage actually finished, not
+// from a fixed schedule computed once up front.
 export function stagesToMilestones(stages) {
-  let cum = 0;
-  return stages.map((s) => {
-    cum += Number(s.days) || 0;
-    return { day: cum, label: s.label };
-  });
+  return stages.map((s) => ({ label: s.label, days: Number(s.days) || 0 }));
 }
 
 export function templateKeyForDesign(design) {

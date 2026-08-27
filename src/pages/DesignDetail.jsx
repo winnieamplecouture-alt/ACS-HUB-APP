@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap } from "lucide-react";
 import StatusPill from "../components/StatusPill";
-import { CATEGORIES, DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
+import { CATEGORIES, DELAY_REASONS, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
 import { useDesigns } from "../state/DesignsContext";
 
@@ -56,7 +56,7 @@ export default function DesignDetail() {
   const [recoveryDate, setRecoveryDate] = useState(design?.timeline?.delay?.recoveryDate ?? "");
   const [startDateInput, setStartDateInput] = useState(toISO(new Date()));
   const [milestoneDates, setMilestoneDates] = useState({});
-  const [pendingDay, setPendingDay] = useState(null);
+  const [pendingIndex, setPendingIndex] = useState(null);
   const [pendingDate, setPendingDate] = useState("");
   const [pendingNote, setPendingNote] = useState("");
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -87,23 +87,24 @@ export default function DesignDetail() {
   const { expected, next } = expectedVsActual(design);
   const previewTemplate = templateForDesign(design);
   const previewTotalDays = totalDays(previewTemplate.stages);
-  const totalDaysForDesign = design.timeline ? design.timeline.milestones.at(-1)?.day ?? previewTotalDays : previewTotalDays;
+  const totalDaysForDesign = design.timeline ? totalTimelineDays(design) : previewTotalDays;
+  const milestonesWithDates = design.timeline ? withTargetDates(design) : [];
 
   function saveDelay() {
     setDelay(design.uid, { reason, action, pic: delayPic, recoveryDate });
   }
 
-  function openPending(m) {
-    setPendingDay(m.day);
-    setPendingDate(milestoneDates[m.day] ?? toISO(new Date()));
+  function openPending(m, index) {
+    setPendingIndex(index);
+    setPendingDate(milestoneDates[index] ?? toISO(new Date()));
     setPendingNote(m.note ?? "");
   }
 
-  function confirmPending(m) {
+  function confirmPending(index) {
     if (!pendingNote.trim()) return;
-    setMilestoneDates((prev) => ({ ...prev, [m.day]: pendingDate }));
-    toggleMilestone(design.uid, m.day, true, new Date(pendingDate), pendingNote.trim());
-    setPendingDay(null);
+    setMilestoneDates((prev) => ({ ...prev, [index]: pendingDate }));
+    toggleMilestone(design.uid, index, true, new Date(pendingDate), pendingNote.trim());
+    setPendingIndex(null);
     setPendingNote("");
   }
 
@@ -175,9 +176,7 @@ export default function DesignDetail() {
     }
   }
 
-  const bestPracticeEntries = design.timeline
-    ? design.timeline.milestones.filter((m) => m.done && m.note)
-    : [];
+  const bestPracticeEntries = milestonesWithDates.filter((m) => m.done && m.note);
 
   return (
     <div className="space-y-5">
@@ -453,7 +452,7 @@ export default function DesignDetail() {
               </p>
               <h2 className="mb-3 mt-4 text-sm font-semibold text-gray-900">Next Target</h2>
               <p className="text-sm text-gray-700">
-                {next ? `Day ${next.day} · ${next.label}` : "All milestones complete"}
+                {next ? `${next.label} · Due ${formatShort(next.targetDate)}` : "All milestones complete"}
               </p>
             </div>
 
@@ -518,37 +517,39 @@ export default function DesignDetail() {
             <div className="rounded-xl border border-gray-200 bg-white p-5">
               <h2 className="mb-4 text-sm font-semibold text-gray-900">Timeline Progress</h2>
               <p className="mb-4 text-xs text-gray-400">
-                Tick a step when it's done — you'll be asked for the date and a short best-practice note before it's saved.
+                Each step's due date is the date you completed the step before it, plus that step's configured days. Tick a step when it's
+                done — you'll be asked for the date and a short best-practice note before it's saved.
               </p>
               <ul className="space-y-3">
-                {design.timeline.milestones.map((m) => {
-                  const dateValue = milestoneDates[m.day] ?? toISO(m.completedDate ?? new Date());
-                  const isPending = pendingDay === m.day;
+                {milestonesWithDates.map((m, index) => {
+                  const dateValue = milestoneDates[index] ?? toISO(m.completedDate ?? new Date());
+                  const isPending = pendingIndex === index;
                   return (
-                    <li key={m.day}>
+                    <li key={index}>
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => (m.done ? toggleMilestone(design.uid, m.day, false) : openPending(m))}
+                          onClick={() => (m.done ? toggleMilestone(design.uid, index, false) : openPending(m, index))}
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                             m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
                           }`}
                         >
                           {m.done && <Check size={13} />}
                         </button>
-                        <span className="w-14 shrink-0 text-xs text-gray-400">Day {m.day}</span>
                         <span className={`flex-1 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>{m.label}</span>
-                        {m.done && (
+                        {m.done ? (
                           <input
                             type="date"
                             value={dateValue}
                             max={toISO(new Date())}
                             onChange={(e) => {
                               const v = e.target.value;
-                              setMilestoneDates((prev) => ({ ...prev, [m.day]: v }));
-                              toggleMilestone(design.uid, m.day, true, new Date(v), m.note);
+                              setMilestoneDates((prev) => ({ ...prev, [index]: v }));
+                              toggleMilestone(design.uid, index, true, new Date(v), m.note);
                             }}
                             className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                           />
+                        ) : (
+                          <span className="shrink-0 text-xs text-gray-400">Due {formatShort(m.targetDate)}</span>
                         )}
                       </div>
                       {isPending && (
@@ -572,6 +573,9 @@ export default function DesignDetail() {
                               {pendingDate && pendingDate <= toISO(m.targetDate) ? "🟢 On time" : "🔴 Overdue"}
                             </span>
                           </div>
+                          <p className="text-[11px] text-gray-400">
+                            Due date was {formatShort(m.targetDate)} ({m.days} day{m.days === 1 ? "" : "s"} after the previous step).
+                          </p>
                           <textarea
                             value={pendingNote}
                             onChange={(e) => setPendingNote(e.target.value)}
@@ -581,13 +585,13 @@ export default function DesignDetail() {
                           />
                           <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => setPendingDay(null)}
+                              onClick={() => setPendingIndex(null)}
                               className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
                             >
                               Cancel
                             </button>
                             <button
-                              onClick={() => confirmPending(m)}
+                              onClick={() => confirmPending(index)}
                               disabled={!pendingNote.trim()}
                               className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                             >
@@ -611,17 +615,17 @@ export default function DesignDetail() {
                 <p className="text-xs text-gray-400">Nothing recorded yet — tick a step to add the first note.</p>
               ) : (
                 <ul className="space-y-3">
-                  {bestPracticeEntries.map((m) => {
+                  {bestPracticeEntries.map((m, i) => {
                     const onTime = m.completedDate && m.targetDate && toISO(m.completedDate) <= toISO(m.targetDate);
                     return (
-                      <li key={m.day} className={`rounded-lg border p-3 text-xs ${onTime ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
+                      <li key={i} className={`rounded-lg border p-3 text-xs ${onTime ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
                         <div className="flex items-center justify-between">
                           <span className={`font-medium ${onTime ? "text-emerald-700" : "text-red-700"}`}>
                             {onTime ? "🟢 Completed in time" : "🔴 Overdue"}
                           </span>
                           <span className="text-gray-400">{formatShort(m.completedDate)}</span>
                         </div>
-                        <p className="mt-1 text-gray-500">{m.label} (Day {m.day})</p>
+                        <p className="mt-1 text-gray-500">{m.label} (due {formatShort(m.targetDate)})</p>
                         <p className="mt-1 text-gray-700">{m.note}</p>
                       </li>
                     );

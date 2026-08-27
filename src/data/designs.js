@@ -15,15 +15,15 @@
 // unless a design falls behind, and then only four short fields.
 
 export const DESIGN_MILESTONES = [
-  { day: 1, label: "Order Confirmed" },
-  { day: 3, label: "Measurement Done" },
-  { day: 6, label: "Fabric Ordered" },
-  { day: 10, label: "Pattern Complete" },
-  { day: 15, label: "First Sample" },
-  { day: 18, label: "Fitting" },
-  { day: 21, label: "Production" },
-  { day: 26, label: "QC" },
-  { day: 30, label: "Delivered" },
+  { days: 1, label: "Order Confirmed" },
+  { days: 2, label: "Measurement Done" },
+  { days: 3, label: "Fabric Ordered" },
+  { days: 4, label: "Pattern Complete" },
+  { days: 5, label: "First Sample" },
+  { days: 3, label: "Fitting" },
+  { days: 3, label: "Production" },
+  { days: 5, label: "QC" },
+  { days: 4, label: "Delivered" },
 ];
 
 export const DELAY_REASONS = ["Customer", "Supplier", "Factory", "Internal", "Other"];
@@ -83,33 +83,56 @@ function startOfDay(d) {
   return x;
 }
 
+function addDays(date, n) {
+  const x = new Date(date);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+
 export function startDesignTimeline(startDate = new Date(), milestoneDefs = DESIGN_MILESTONES) {
   const start = startOfDay(startDate);
   return {
     startDate: start,
-    milestones: milestoneDefs.map((m) => {
-      const target = new Date(start);
-      target.setDate(target.getDate() + (m.day - 1));
-      return { ...m, targetDate: target, done: false, completedDate: null, note: null };
-    }),
+    milestones: milestoneDefs.map((m) => ({ label: m.label, days: m.days, done: false, completedDate: null, note: null })),
     delay: null,
   };
 }
 
+// Each milestone's due date is calculated from when the PREVIOUS one was
+// actually completed (or the timeline's start date, for the first one) plus
+// that stage's configured number of days — not from the original start date
+// alone. So marking a step done late pushes every date after it out too,
+// and marking it done early can pull the rest forward.
+export function withTargetDates(design) {
+  if (!design.timeline) return [];
+  let anchor = design.timeline.startDate;
+  return design.timeline.milestones.map((m) => {
+    const targetDate = addDays(anchor, m.days);
+    anchor = m.done && m.completedDate ? m.completedDate : targetDate;
+    return { ...m, targetDate };
+  });
+}
+
+export function totalTimelineDays(design) {
+  if (!design.timeline) return 0;
+  return design.timeline.milestones.reduce((sum, m) => sum + m.days, 0);
+}
+
 // Automatic status: on_track / at_risk / behind / completed / not_started.
-// "Behind" = today's date has passed the next unticked milestone's target.
+// "Behind" = today's date is past the next unticked milestone's due date.
 export function designStatus(design, today = new Date()) {
   if (!design.timeline) return { key: "not_started", label: "Not Started", emoji: "⚪" };
 
-  const t = startOfDay(today);
+  const t = startOfDay(today).getTime();
   const currentDay = Math.floor((t - design.timeline.startDate) / 86400000) + 1;
-  const next = design.timeline.milestones.find((m) => !m.done);
+  const next = withTargetDates(design).find((m) => !m.done);
 
   if (!next) return { key: "completed", label: "Completed", emoji: "✅", currentDay };
 
+  const dueDay = startOfDay(next.targetDate).getTime();
   let key;
-  if (currentDay < next.day) key = "on_track";
-  else if (currentDay === next.day) key = "at_risk";
+  if (t < dueDay) key = "on_track";
+  else if (t === dueDay) key = "at_risk";
   else key = "behind";
 
   const labels = { on_track: "On Track", at_risk: "At Risk", behind: "Behind" };
@@ -119,12 +142,11 @@ export function designStatus(design, today = new Date()) {
 
 export function expectedVsActual(design, today = new Date()) {
   if (!design.timeline) return { expected: null, next: null };
-  const { milestones } = design.timeline;
-  const t = startOfDay(today);
-  const currentDay = Math.floor((t - design.timeline.startDate) / 86400000) + 1;
-  // Expected = the last milestone whose target day has arrived; if it's done,
+  const milestones = withTargetDates(design);
+  const t = startOfDay(today).getTime();
+  // Expected = the last milestone whose due date has arrived; if it's done,
   // "expected" naturally advances to whichever one is still pending.
-  const dueOrOverdue = milestones.filter((m) => m.day <= currentDay);
+  const dueOrOverdue = milestones.filter((m) => startOfDay(m.targetDate).getTime() <= t);
   const expected = dueOrOverdue.at(-1) ?? null;
   const next = milestones.find((m) => !m.done) ?? null;
   return { expected, next };

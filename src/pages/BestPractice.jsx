@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Award } from "lucide-react";
+import { withTargetDates } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 function toISO(d) {
@@ -18,7 +19,7 @@ export default function BestPractice() {
     const rows = [];
     for (const d of designs) {
       if (!d.timeline) continue;
-      for (const m of d.timeline.milestones) {
+      for (const m of withTargetDates(d)) {
         if (!m.done || !m.note) continue;
         const onTime = m.completedDate && m.targetDate && toISO(m.completedDate) <= toISO(m.targetDate);
         rows.push({ design: d, milestone: m, onTime });
@@ -82,15 +83,15 @@ function Column({ title, rows, tone }) {
         <p className="text-xs text-gray-400">Nothing here yet.</p>
       ) : (
         <ul className="space-y-3">
-          {rows.map(({ design, milestone }) => (
-            <li key={`${design.id}-${milestone.day}`} className={`rounded-lg border p-3 text-xs ${TONE_CLASSES[tone]}`}>
+          {rows.map(({ design, milestone }, i) => (
+            <li key={`${design.uid}-${i}`} className={`rounded-lg border p-3 text-xs ${TONE_CLASSES[tone]}`}>
               <div className="flex items-center justify-between">
                 <Link to={`/designs/${design.id}`} className="font-medium text-gray-900 hover:underline">
                   {design.id} · {design.customer}
                 </Link>
                 <span className="shrink-0 text-gray-400">{formatShort(milestone.completedDate)}</span>
               </div>
-              <p className="mt-1 text-gray-500">{milestone.label} (Day {milestone.day})</p>
+              <p className="mt-1 text-gray-500">{milestone.label} (due {formatShort(milestone.targetDate)})</p>
               <p className="mt-1 text-gray-700">{milestone.note}</p>
             </li>
           ))}

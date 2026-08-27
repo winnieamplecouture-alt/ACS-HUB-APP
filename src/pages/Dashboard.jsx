@@ -2,10 +2,14 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Target, CheckCircle2, Clock, AlertTriangle, TrendingUp } from "lucide-react";
 import StatCard from "../components/StatCard";
-import { designStatus } from "../data/designs";
+import { designStatus, totalTimelineDays } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 const MONTHLY_TARGET = 30;
+
+function formatShort(d) {
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
 
 export default function Dashboard() {
   const { designs } = useDesigns();
@@ -49,17 +53,17 @@ export default function Dashboard() {
         <div className="mt-4 space-y-2">
           {behind.map(({ d, status }) => (
             <Link
-              key={d.id}
+              key={d.uid}
               to={`/designs/${d.id}`}
               className="flex items-center justify-between rounded-lg border border-red-100 bg-red-50 px-4 py-3 hover:bg-red-100/70"
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-900">{d.id}</span>
                 <span className="text-sm text-gray-600">{d.customer}</span>
-                <span className="text-sm text-gray-500">Day {status.currentDay} / {d.timeline.milestones.at(-1)?.day}</span>
+                <span className="text-sm text-gray-500">Day {status.currentDay} / {totalTimelineDays(d)}</span>
               </div>
               <span className="text-sm font-medium text-red-600">
-                Next: {status.nextMilestone.label} (Day {status.nextMilestone.day})
+                Next: {status.nextMilestone.label} (Due {formatShort(status.nextMilestone.targetDate)})
               </span>
             </Link>
           ))}
