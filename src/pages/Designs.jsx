@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Eye, Shirt, Plus, X, Trash2 } from "lucide-react";
+import { Search, Eye, Shirt, Plus, X, Trash2, RotateCcw } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { designStatus, CATEGORIES } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
@@ -17,13 +17,14 @@ const TABS = [
 const emptyForm = { name: "", category: "", remark: "", pic: "" };
 
 export default function Designs() {
-  const { designs, addDesign, deleteDesign } = useDesigns();
+  const { designs, addDesign, deleteDesign, deletedDesigns, restoreDesign } = useDesigns();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [addingFor, setAddingFor] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmDeleteUid, setConfirmDeleteUid] = useState(null);
+  const [showDeleted, setShowDeleted] = useState(false);
   const activeTab = searchParams.get("status") ?? "All";
 
   const withStatus = useMemo(() => designs.map((d) => ({ d, status: designStatus(d) })), [designs]);
@@ -69,17 +70,80 @@ export default function Designs() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Designs</h1>
-        <div className="relative">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search design / customer..."
-            className="w-64 rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
+        <div className="flex items-center gap-3">
+          {!showDeleted && (
+            <div className="relative">
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search design / customer..."
+                className="w-64 rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+          )}
+          <button
+            onClick={() => setShowDeleted((s) => !s)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium ${
+              showDeleted ? "border-blue-200 bg-blue-50 text-blue-700" : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <Trash2 size={14} />
+            Recently Deleted {deletedDesigns.length > 0 && `(${deletedDesigns.length})`}
+          </button>
         </div>
       </div>
 
+      {showDeleted ? (
+        <div className="rounded-xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-100 bg-gray-50/60 px-5 py-3">
+            <p className="text-sm text-gray-500">Deleted designs stay here for 30 days, then are removed automatically.</p>
+          </div>
+          {deletedDesigns.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-gray-400">Nothing deleted.</p>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-5 py-2.5">Design</th>
+                  <th className="px-5 py-2.5">Customer</th>
+                  <th className="px-5 py-2.5">Deleted</th>
+                  <th className="px-5 py-2.5">Expires</th>
+                  <th className="px-5 py-2.5">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deletedDesigns
+                  .slice()
+                  .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt))
+                  .map(({ design: d, deletedAt }) => {
+                    const daysLeft = 30 - Math.floor((Date.now() - new Date(deletedAt).getTime()) / 86400000);
+                    return (
+                      <tr key={d.uid} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-gray-900">{d.id}</p>
+                          <p className="truncate text-xs text-gray-400">{d.name}</p>
+                        </td>
+                        <td className="px-5 py-3 text-gray-700">{d.customer}</td>
+                        <td className="px-5 py-3 text-gray-500">{new Date(deletedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</td>
+                        <td className="px-5 py-3 text-gray-500">{daysLeft <= 3 ? <span className="text-red-600">{daysLeft}d left</span> : `${daysLeft}d left`}</td>
+                        <td className="px-5 py-3">
+                          <button
+                            onClick={() => restoreDesign(d.uid)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            <RotateCcw size={13} /> Restore
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : (
+      <>
       <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-200">
         {TABS.map((tab) => (
           <button
@@ -174,7 +238,7 @@ export default function Designs() {
               </thead>
               <tbody>
                 {rows.map(({ d, status }) => (
-                  <tr key={d.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
+                  <tr key={d.uid} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/60">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         {d.photo ? (
@@ -214,20 +278,20 @@ export default function Designs() {
                     </td>
                     <td className="px-5 py-3 text-gray-700">{d.pic ?? <span className="text-gray-400">Unassigned</span>}</td>
                     <td className="px-5 py-3">
-                      {confirmDeleteId === d.id ? (
+                      {confirmDeleteUid === d.uid ? (
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <span className="text-xs text-red-600">Delete {d.id}?</span>
                           <button
                             onClick={() => {
-                              deleteDesign(d.id);
-                              setConfirmDeleteId(null);
+                              deleteDesign(d.uid);
+                              setConfirmDeleteUid(null);
                             }}
                             className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
                           >
                             Delete
                           </button>
                           <button
-                            onClick={() => setConfirmDeleteId(null)}
+                            onClick={() => setConfirmDeleteUid(null)}
                             className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
                           >
                             Cancel
@@ -242,7 +306,7 @@ export default function Designs() {
                             <Eye size={16} />
                           </Link>
                           <button
-                            onClick={() => setConfirmDeleteId(d.id)}
+                            onClick={() => setConfirmDeleteUid(d.uid)}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"
                           >
                             <Trash2 size={16} />
@@ -262,6 +326,8 @@ export default function Designs() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {lightbox && (
         <div

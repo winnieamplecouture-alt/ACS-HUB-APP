@@ -2,8 +2,53 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { BASE_DESIGNS, startDesignTimeline } from "../data/designs";
 import { DEFAULT_TIMELINE_TEMPLATES, stagesToMilestones, templateKeyForDesign } from "../data/timelineTemplates";
 
-const STORAGE_KEY = "acs-hub-designs-v1";
+const STORAGE_KEY = "acs-hub-designs-v2";
+const DELETED_STORAGE_KEY = "acs-hub-deleted-designs-v1";
 const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v1";
+const STAFF_STORAGE_KEY = "acs-hub-staff-v1";
+const RETENTION_DAYS = 30;
+
+function genUid() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `uid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+// Every design gets its own permanent, never-shown, never-edited uid. The
+// CDS code (`id`) is just an editable label — using it as the delete/update
+// key was the bug where two similar-looking codes could end up referring to
+// (or clobbering) the same record. All mutations below key off uid instead.
+function ensureUids(designs) {
+  return designs.map((d) => (d.uid ? d : { ...d, uid: genUid() }));
+}
+
+// Defensive net: if two designs ever end up with the same CDS code (however
+// that happened), disambiguate every one after the first so they can never
+// be confused with each other again.
+function dedupeIds(designs) {
+  const seen = new Set();
+  return designs.map((d) => {
+    if (!seen.has(d.id)) {
+      seen.add(d.id);
+      return d;
+    }
+    let candidate = `${d.id}-dup`;
+    let n = 2;
+    while (seen.has(candidate)) candidate = `${d.id}-dup${n++}`;
+    seen.add(candidate);
+    return { ...d, id: candidate };
+  });
+}
+
+function loadInitialStaff() {
+  try {
+    const raw = localStorage.getItem(STAFF_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fall through to defaults
+  }
+  const fromDesigns = [...new Set(BASE_DESIGNS.map((d) => d.pic).filter(Boolean))];
+  return fromDesigns.length ? fromDesigns : ["Winnie"];
+}
 
 function loadInitialTemplates() {
   try {
@@ -33,35 +78,50 @@ function reviveMilestone(m) {
   };
 }
 
-function reviveDesigns(designs) {
-  return designs.map((d) => {
-    if (!d.timeline) return d;
-    return {
-      ...d,
-      timeline: {
-        ...d.timeline,
-        startDate: new Date(d.timeline.startDate),
-        milestones: d.timeline.milestones.map(reviveMilestone),
-      },
-    };
-  });
+function reviveDesign(d) {
+  if (!d.timeline) return d;
+  return {
+    ...d,
+    timeline: {
+      ...d.timeline,
+      startDate: new Date(d.timeline.startDate),
+      milestones: d.timeline.milestones.map(reviveMilestone),
+    },
+  };
 }
 
 function loadInitialDesigns() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return BASE_DESIGNS;
-    return reviveDesigns(JSON.parse(raw));
+    if (!raw) return dedupeIds(ensureUids(BASE_DESIGNS));
+    return dedupeIds(ensureUids(JSON.parse(raw).map(reviveDesign)));
   } catch {
-    return BASE_DESIGNS;
+    return dedupeIds(ensureUids(BASE_DESIGNS));
   }
+}
+
+function loadInitialDeleted() {
+  try {
+    const raw = localStorage.getItem(DELETED_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw).map((entry) => ({ ...entry, design: reviveDesign(entry.design) }));
+  } catch {
+    return [];
+  }
+}
+
+function isExpired(entry) {
+  const ageMs = Date.now() - new Date(entry.deletedAt).getTime();
+  return ageMs > RETENTION_DAYS * 24 * 60 * 60 * 1000;
 }
 
 const DesignsContext = createContext(null);
 
 export function DesignsProvider({ children }) {
   const [designs, setDesigns] = useState(loadInitialDesigns);
+  const [deletedDesigns, setDeletedDesigns] = useState(loadInitialDeleted);
   const [templates, setTemplates] = useState(loadInitialTemplates);
+  const [staff, setStaff] = useState(loadInitialStaff);
 
   useEffect(() => {
     try {
@@ -73,24 +133,47 @@ export function DesignsProvider({ children }) {
 
   useEffect(() => {
     try {
+      localStorage.setItem(DELETED_STORAGE_KEY, JSON.stringify(deletedDesigns));
+    } catch {
+      // storage full or unavailable — edits still work for this session
+    }
+  }, [deletedDesigns]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(TEMPLATES_STORAGE_KEY, JSON.stringify(templates));
     } catch {
       // storage full or unavailable — edits still work for this session
     }
   }, [templates]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(staff));
+    } catch {
+      // storage full or unavailable — edits still work for this session
+    }
+  }, [staff]);
+
+  // Purge anything past the 30-day retention window — checked once when the
+  // app opens, which is as close to "automatic" as a backend-less app gets.
+  useEffect(() => {
+    setDeletedDesigns((prev) => prev.filter((entry) => !isExpired(entry)));
+  }, []);
+
   const value = useMemo(
     () => ({
       designs,
+      deletedDesigns,
       templates,
       getDesign: (id) => designs.find((d) => d.id === id),
 
       templateForDesign: (design) => templates[templateKeyForDesign(design)],
 
-      startTimeline: (id, startDate = new Date()) => {
+      startTimeline: (uid, startDate = new Date()) => {
         setDesigns((prev) =>
           prev.map((d) => {
-            if (d.id !== id) return d;
+            if (d.uid !== uid) return d;
             const template = templates[templateKeyForDesign(d)];
             const milestoneDefs = stagesToMilestones(template.stages);
             return { ...d, timeline: startDesignTimeline(startDate, milestoneDefs) };
@@ -108,10 +191,10 @@ export function DesignsProvider({ children }) {
         }));
       },
 
-      toggleMilestone: (id, day, done, completedDate = new Date(), note = null) => {
+      toggleMilestone: (uid, day, done, completedDate = new Date(), note = null) => {
         setDesigns((prev) =>
           prev.map((d) => {
-            if (d.id !== id || !d.timeline) return d;
+            if (d.uid !== uid || !d.timeline) return d;
             const milestones = d.timeline.milestones.map((m) =>
               m.day === day ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null } : m
             );
@@ -120,9 +203,9 @@ export function DesignsProvider({ children }) {
         );
       },
 
-      setDelay: (id, delay) => {
+      setDelay: (uid, delay) => {
         setDesigns((prev) =>
-          prev.map((d) => (d.id === id && d.timeline ? { ...d, timeline: { ...d.timeline, delay } } : d))
+          prev.map((d) => (d.uid === uid && d.timeline ? { ...d, timeline: { ...d.timeline, delay } } : d))
         );
       },
 
@@ -130,30 +213,61 @@ export function DesignsProvider({ children }) {
         let newId;
         setDesigns((prev) => {
           newId = nextDesignId(prev);
-          return [...prev, { id: newId, name, customer, pic: pic || null, category: category || "", remark: remark || "", timeline: null }];
+          return [...prev, { uid: genUid(), id: newId, name, customer, pic: pic || null, category: category || "", remark: remark || "", timeline: null }];
         });
         return newId;
       },
 
-      updateDesign: (id, patch) => {
-        setDesigns((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+      updateDesign: (uid, patch) => {
+        setDesigns((prev) => prev.map((d) => (d.uid === uid ? { ...d, ...patch } : d)));
       },
 
-      renameDesignId: (oldId, newId) => {
+      renameDesignId: (uid, newId) => {
         const trimmed = newId.trim();
-        if (!trimmed || trimmed === oldId) return { ok: false, error: null };
-        if (designs.some((d) => d.id === trimmed)) {
+        const current = designs.find((d) => d.uid === uid);
+        if (!current || !trimmed || trimmed === current.id) return { ok: false, error: null };
+        if (designs.some((d) => d.uid !== uid && d.id === trimmed)) {
           return { ok: false, error: `${trimmed} is already in use by another design.` };
         }
-        setDesigns((prev) => prev.map((d) => (d.id === oldId ? { ...d, id: trimmed } : d)));
+        setDesigns((prev) => prev.map((d) => (d.uid === uid ? { ...d, id: trimmed } : d)));
         return { ok: true, error: null };
       },
 
-      deleteDesign: (id) => {
-        setDesigns((prev) => prev.filter((d) => d.id !== id));
+      deleteDesign: (uid) => {
+        const target = designs.find((d) => d.uid === uid);
+        if (!target) return;
+        setDesigns((prev) => prev.filter((d) => d.uid !== uid));
+        setDeletedDesigns((prev) => [...prev, { design: target, deletedAt: new Date().toISOString() }]);
+      },
+
+      restoreDesign: (uid) => {
+        const entry = deletedDesigns.find((e) => e.design.uid === uid);
+        if (!entry) return;
+        setDesigns((prev) => {
+          const collides = prev.some((d) => d.id === entry.design.id);
+          const restored = collides ? { ...entry.design, id: `${entry.design.id}-restored` } : entry.design;
+          return [...prev, restored];
+        });
+        setDeletedDesigns((prev) => prev.filter((e) => e.design.uid !== uid));
+      },
+
+      permanentlyDeleteDesign: (uid) => {
+        setDeletedDesigns((prev) => prev.filter((e) => e.design.uid !== uid));
+      },
+
+      staff,
+
+      addStaff: (name) => {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        setStaff((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
+      },
+
+      removeStaff: (name) => {
+        setStaff((prev) => prev.filter((s) => s !== name));
       },
     }),
-    [designs, templates]
+    [designs, deletedDesigns, templates, staff]
   );
 
   return <DesignsContext.Provider value={value}>{children}</DesignsContext.Provider>;

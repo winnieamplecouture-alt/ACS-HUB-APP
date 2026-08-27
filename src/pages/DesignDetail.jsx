@@ -47,7 +47,7 @@ function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
 export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getDesign, startTimeline, toggleMilestone, setDelay, updateDesign, renameDesignId, templateForDesign } = useDesigns();
+  const { getDesign, startTimeline, toggleMilestone, setDelay, updateDesign, renameDesignId, templateForDesign, staff } = useDesigns();
   const design = getDesign(id);
 
   const [reason, setReason] = useState(design?.timeline?.delay?.reason ?? DELAY_REASONS[0]);
@@ -90,7 +90,7 @@ export default function DesignDetail() {
   const totalDaysForDesign = design.timeline ? design.timeline.milestones.at(-1)?.day ?? previewTotalDays : previewTotalDays;
 
   function saveDelay() {
-    setDelay(design.id, { reason, action, pic: delayPic, recoveryDate });
+    setDelay(design.uid, { reason, action, pic: delayPic, recoveryDate });
   }
 
   function openPending(m) {
@@ -102,7 +102,7 @@ export default function DesignDetail() {
   function confirmPending(m) {
     if (!pendingNote.trim()) return;
     setMilestoneDates((prev) => ({ ...prev, [m.day]: pendingDate }));
-    toggleMilestone(design.id, m.day, true, new Date(pendingDate), pendingNote.trim());
+    toggleMilestone(design.uid, m.day, true, new Date(pendingDate), pendingNote.trim());
     setPendingDay(null);
     setPendingNote("");
   }
@@ -119,7 +119,7 @@ export default function DesignDetail() {
       setEditingId(false);
       return;
     }
-    const result = renameDesignId(design.id, trimmed);
+    const result = renameDesignId(design.uid, trimmed);
     if (!result.ok) {
       setIdError(result.error ?? "Couldn't rename.");
       return;
@@ -135,7 +135,7 @@ export default function DesignDetail() {
 
   function saveCustomer() {
     if (customerInput.trim()) {
-      updateDesign(design.id, { customer: customerInput.trim() });
+      updateDesign(design.uid, { customer: customerInput.trim() });
     }
     setEditingCustomer(false);
   }
@@ -147,7 +147,7 @@ export default function DesignDetail() {
 
   function saveName() {
     if (nameInput.trim()) {
-      updateDesign(design.id, { name: nameInput.trim() });
+      updateDesign(design.uid, { name: nameInput.trim() });
     }
     setEditingName(false);
   }
@@ -158,7 +158,7 @@ export default function DesignDetail() {
   }
 
   function saveRemark() {
-    updateDesign(design.id, { remark: remarkInput.trim() });
+    updateDesign(design.uid, { remark: remarkInput.trim() });
     setEditingRemark(false);
   }
 
@@ -169,7 +169,7 @@ export default function DesignDetail() {
     setPhotoUploading(true);
     try {
       const dataUrl = await resizeImageToDataUrl(file);
-      updateDesign(design.id, { photo: dataUrl });
+      updateDesign(design.uid, { photo: dataUrl });
     } finally {
       setPhotoUploading(false);
     }
@@ -261,7 +261,7 @@ export default function DesignDetail() {
               )}
               <select
                 value={design.category ?? ""}
-                onChange={(e) => updateDesign(design.id, { category: e.target.value })}
+                onChange={(e) => updateDesign(design.uid, { category: e.target.value })}
                 className="rounded-full border-0 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">No Category</option>
@@ -270,7 +270,7 @@ export default function DesignDetail() {
                 ))}
               </select>
               <button
-                onClick={() => updateDesign(design.id, { urgent: !design.urgent })}
+                onClick={() => updateDesign(design.uid, { urgent: !design.urgent })}
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition ${
                   design.urgent ? "bg-red-100 text-red-700" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
                 }`}
@@ -334,7 +334,23 @@ export default function DesignDetail() {
             )}
             <p className="mt-1 text-[11px] text-gray-400">Wrong customer? Edit here and it moves to the right group in the Designs list.</p>
           </div>
-          <Field icon={<User size={14} />} label="PIC" value={design.pic ?? "Unassigned"} />
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <User size={14} />
+              PIC
+            </dt>
+            <select
+              value={design.pic ?? ""}
+              onChange={(e) => updateDesign(design.uid, { pic: e.target.value || null })}
+              className="mt-0.5 -ml-1 rounded-md border-0 bg-transparent px-1 py-0.5 font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Unassigned</option>
+              {staff.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+              {design.pic && !staff.includes(design.pic) && <option value={design.pic}>{design.pic}</option>}
+            </select>
+          </div>
           <div>
             <dt className="text-xs text-gray-400">Remark</dt>
             {editingRemark ? (
@@ -416,7 +432,7 @@ export default function DesignDetail() {
                   className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
                 <button
-                  onClick={() => startTimeline(design.id, new Date(startDateInput))}
+                  onClick={() => startTimeline(design.uid, new Date(startDateInput))}
                   className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   Start {previewTotalDays}-Day Timeline
@@ -512,7 +528,7 @@ export default function DesignDetail() {
                     <li key={m.day}>
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => (m.done ? toggleMilestone(design.id, m.day, false) : openPending(m))}
+                          onClick={() => (m.done ? toggleMilestone(design.uid, m.day, false) : openPending(m))}
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
                             m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
                           }`}
@@ -529,7 +545,7 @@ export default function DesignDetail() {
                             onChange={(e) => {
                               const v = e.target.value;
                               setMilestoneDates((prev) => ({ ...prev, [m.day]: v }));
-                              toggleMilestone(design.id, m.day, true, new Date(v), m.note);
+                              toggleMilestone(design.uid, m.day, true, new Date(v), m.note);
                             }}
                             className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                           />
@@ -618,18 +634,6 @@ export default function DesignDetail() {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({ icon, label, value }) {
-  return (
-    <div>
-      <dt className="flex items-center gap-1 text-xs text-gray-400">
-        {icon}
-        {label}
-      </dt>
-      <dd className="mt-0.5 font-medium text-gray-800">{value}</dd>
     </div>
   );
 }

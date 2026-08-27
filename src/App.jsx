@@ -6,7 +6,7 @@ import DesignDetail from "./pages/DesignDetail";
 import Reports from "./pages/Reports";
 import BestPractice from "./pages/BestPractice";
 import Settings from "./pages/Settings";
-import Placeholder from "./pages/Placeholder";
+import CalendarPage from "./pages/Calendar";
 import { DesignsProvider } from "./state/DesignsContext";
 
 export default function App() {
@@ -21,7 +21,7 @@ export default function App() {
             <Route path="/designs/:id" element={<DesignDetail />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/best-practice" element={<BestPractice />} />
-            <Route path="/calendar" element={<Placeholder title="Calendar" />} />
+            <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
