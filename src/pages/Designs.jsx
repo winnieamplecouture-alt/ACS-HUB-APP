@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Eye, Shirt, Plus, X } from "lucide-react";
+import { Search, Eye, Shirt, Plus, X, Trash2 } from "lucide-react";
 import StatusPill from "../components/StatusPill";
-import { designStatus } from "../data/designs";
+import { designStatus, CATEGORIES } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 const TABS = [
@@ -14,17 +14,16 @@ const TABS = [
   { key: "not_started", label: "Not Started" },
 ];
 
-const CATEGORIES = ["RTW", "High End", "Couture"];
-
 const emptyForm = { name: "", category: "", remark: "", pic: "" };
 
 export default function Designs() {
-  const { designs, addDesign } = useDesigns();
+  const { designs, addDesign, deleteDesign } = useDesigns();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [addingFor, setAddingFor] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const activeTab = searchParams.get("status") ?? "All";
 
   const withStatus = useMemo(() => designs.map((d) => ({ d, status: designStatus(d) })), [designs]);
@@ -215,12 +214,41 @@ export default function Designs() {
                     </td>
                     <td className="px-5 py-3 text-gray-700">{d.pic ?? <span className="text-gray-400">Unassigned</span>}</td>
                     <td className="px-5 py-3">
-                      <Link
-                        to={`/designs/${d.id}`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                      >
-                        <Eye size={16} />
-                      </Link>
+                      {confirmDeleteId === d.id ? (
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <span className="text-xs text-red-600">Delete {d.id}?</span>
+                          <button
+                            onClick={() => {
+                              deleteDesign(d.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700"
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <Link
+                            to={`/designs/${d.id}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                          >
+                            <Eye size={16} />
+                          </Link>
+                          <button
+                            onClick={() => setConfirmDeleteId(d.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -28,6 +28,8 @@ export const DESIGN_MILESTONES = [
 
 export const DELAY_REASONS = ["Customer", "Supplier", "Factory", "Internal", "Other"];
 
+export const CATEGORIES = ["RTW", "High End", "Couture"];
+
 export const BASE_DESIGNS = [
   { id: "CDS1.1", photo: "/design-photos/CDS1.1.jpg", name: "Butterfly Gown 2-Piece Set (Top+Skirt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "High End", remark: "Fabric sourcing china (order china)", timeline: null },
   { id: "CDS1.2", photo: "/design-photos/CDS1.2.jpg", name: "Elegant Halter 2-Piece Set (Top+Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Fabric sourcing", timeline: null },

@@ -148,6 +148,10 @@ export function DesignsProvider({ children }) {
         setDesigns((prev) => prev.map((d) => (d.id === oldId ? { ...d, id: trimmed } : d)));
         return { ok: true, error: null };
       },
+
+      deleteDesign: (id) => {
+        setDesigns((prev) => prev.filter((d) => d.id !== id));
+      },
     }),
     [designs, templates]
   );

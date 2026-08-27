@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap } from "lucide-react";
 import StatusPill from "../components/StatusPill";
-import { DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
+import { CATEGORIES, DELAY_REASONS, designStatus, expectedVsActual } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
 import { useDesigns } from "../state/DesignsContext";
 
@@ -65,6 +65,10 @@ export default function DesignDetail() {
   const [idError, setIdError] = useState("");
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [customerInput, setCustomerInput] = useState(design?.customer ?? "");
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(design?.name ?? "");
+  const [editingRemark, setEditingRemark] = useState(false);
+  const [remarkInput, setRemarkInput] = useState(design?.remark ?? "");
   const [photoUploading, setPhotoUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -136,6 +140,28 @@ export default function DesignDetail() {
     setEditingCustomer(false);
   }
 
+  function startEditName() {
+    setNameInput(design.name);
+    setEditingName(true);
+  }
+
+  function saveName() {
+    if (nameInput.trim()) {
+      updateDesign(design.id, { name: nameInput.trim() });
+    }
+    setEditingName(false);
+  }
+
+  function startEditRemark() {
+    setRemarkInput(design.remark ?? "");
+    setEditingRemark(true);
+  }
+
+  function saveRemark() {
+    updateDesign(design.id, { remark: remarkInput.trim() });
+    setEditingRemark(false);
+  }
+
   async function handlePhotoFile(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -205,9 +231,44 @@ export default function DesignDetail() {
                 </button>
               </h1>
             )}
-            <p className="mt-1 flex items-center gap-2 text-sm text-gray-500">
-              {design.name}
-              {design.category && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">{design.category}</span>}
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              {editingName ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveName();
+                      if (e.key === "Escape") setEditingName(false);
+                    }}
+                    className="rounded-md border border-gray-300 px-2 py-0.5 text-sm text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <button onClick={saveName} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingName(false)} className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <span className="group inline-flex items-center gap-1.5">
+                  {design.name}
+                  <button onClick={startEditName} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                    <Pencil size={12} />
+                  </button>
+                </span>
+              )}
+              <select
+                value={design.category ?? ""}
+                onChange={(e) => updateDesign(design.id, { category: e.target.value })}
+                className="rounded-full border-0 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">No Category</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
               <button
                 onClick={() => updateDesign(design.id, { urgent: !design.urgent })}
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition ${
@@ -274,7 +335,38 @@ export default function DesignDetail() {
             <p className="mt-1 text-[11px] text-gray-400">Wrong customer? Edit here and it moves to the right group in the Designs list.</p>
           </div>
           <Field icon={<User size={14} />} label="PIC" value={design.pic ?? "Unassigned"} />
-          {design.remark && <Field label="Remark" value={design.remark} />}
+          <div>
+            <dt className="text-xs text-gray-400">Remark</dt>
+            {editingRemark ? (
+              <div className="mt-0.5 flex items-start gap-2">
+                <textarea
+                  autoFocus
+                  rows={2}
+                  value={remarkInput}
+                  onChange={(e) => setRemarkInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditingRemark(false);
+                  }}
+                  className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button onClick={saveRemark} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingRemark(false)} className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <dd className="group mt-0.5 flex items-start gap-1.5 font-medium text-gray-800">
+                <span>{design.remark || <span className="font-normal text-gray-400">No remark</span>}</span>
+                <button onClick={startEditRemark} className="shrink-0 text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </dd>
+            )}
+          </div>
         </dl>
       </div>
 
