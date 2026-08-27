@@ -4,7 +4,7 @@ import { DEFAULT_TIMELINE_TEMPLATES, stagesToMilestones, templateKeyForDesign } 
 
 const STORAGE_KEY = "acs-hub-designs-v2";
 const DELETED_STORAGE_KEY = "acs-hub-deleted-designs-v1";
-const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v1";
+const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v2";
 const STAFF_STORAGE_KEY = "acs-hub-staff-v1";
 const RETENTION_DAYS = 30;
 
@@ -243,6 +243,33 @@ export function DesignsProvider({ children }) {
               i === index ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null } : m
             );
             return { ...d, timeline: { ...d.timeline, milestones } };
+          })
+        );
+      },
+
+      addMilestone: (uid, { label, days, afterIndex }) => {
+        setDesigns((prev) =>
+          prev.map((d) => {
+            if (d.uid !== uid || !d.timeline) return d;
+            const milestones = [...d.timeline.milestones];
+            milestones.splice(afterIndex + 1, 0, {
+              label,
+              days: Math.max(0, Number(days) || 0),
+              done: false,
+              completedDate: null,
+              note: null,
+              custom: true,
+            });
+            return { ...d, timeline: { ...d.timeline, milestones } };
+          })
+        );
+      },
+
+      removeMilestone: (uid, index) => {
+        setDesigns((prev) =>
+          prev.map((d) => {
+            if (d.uid !== uid || !d.timeline) return d;
+            return { ...d, timeline: { ...d.timeline, milestones: d.timeline.milestones.filter((_, i) => i !== index) } };
           })
         );
       },

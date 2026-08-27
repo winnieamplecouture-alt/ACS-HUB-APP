@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2 } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { CATEGORIES, DELAY_REASONS, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
@@ -47,7 +47,8 @@ function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
 export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getDesign, startTimeline, toggleMilestone, setDelay, updateDesign, renameDesignId, templateForDesign, staff } = useDesigns();
+  const { getDesign, startTimeline, toggleMilestone, addMilestone, removeMilestone, setDelay, updateDesign, renameDesignId, templateForDesign, staff } =
+    useDesigns();
   const design = getDesign(id);
 
   const [reason, setReason] = useState(design?.timeline?.delay?.reason ?? DELAY_REASONS[0]);
@@ -60,6 +61,10 @@ export default function DesignDetail() {
   const [pendingDate, setPendingDate] = useState("");
   const [pendingNote, setPendingNote] = useState("");
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [addingStep, setAddingStep] = useState(false);
+  const [newStepLabel, setNewStepLabel] = useState("");
+  const [newStepDate, setNewStepDate] = useState(toISO(new Date()));
+  const [newStepAfterIndex, setNewStepAfterIndex] = useState(0);
   const [editingId, setEditingId] = useState(false);
   const [idInput, setIdInput] = useState(design?.id ?? "");
   const [idError, setIdError] = useState("");
@@ -106,6 +111,34 @@ export default function DesignDetail() {
     toggleMilestone(design.uid, index, true, new Date(pendingDate), pendingNote.trim());
     setPendingIndex(null);
     setPendingNote("");
+  }
+
+  function openAddStep() {
+    setNewStepLabel("");
+    setNewStepDate(toISO(new Date()));
+    setNewStepAfterIndex(milestonesWithDates.length - 1);
+    setAddingStep(true);
+  }
+
+  function confirmAddStep() {
+    if (!newStepLabel.trim()) return;
+    const anchorMilestone = milestonesWithDates[newStepAfterIndex];
+    const anchor = anchorMilestone
+      ? anchorMilestone.done && anchorMilestone.completedDate
+        ? anchorMilestone.completedDate
+        : anchorMilestone.targetDate
+      : design.timeline.startDate;
+    const days = Math.max(0, Math.round((new Date(newStepDate) - new Date(anchor)) / 86400000));
+    addMilestone(design.uid, { label: newStepLabel.trim(), days, afterIndex: newStepAfterIndex });
+    setMilestoneDates({});
+    setPendingIndex(null);
+    setAddingStep(false);
+  }
+
+  function removeStep(index) {
+    removeMilestone(design.uid, index);
+    setMilestoneDates({});
+    setPendingIndex(null);
   }
 
   function startEditId() {
@@ -535,7 +568,19 @@ export default function DesignDetail() {
                         >
                           {m.done && <Check size={13} />}
                         </button>
-                        <span className={`flex-1 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>{m.label}</span>
+                        <span className={`flex flex-1 items-center gap-1.5 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>
+                          {m.label}
+                          {m.custom && <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Custom</span>}
+                        </span>
+                        {m.custom && !m.done && (
+                          <button
+                            onClick={() => removeStep(index)}
+                            title="Remove this step"
+                            className="shrink-0 text-gray-300 hover:text-red-500"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                         {m.done ? (
                           <input
                             type="date"
@@ -604,6 +649,60 @@ export default function DesignDetail() {
                   );
                 })}
               </ul>
+
+              {addingStep ? (
+                <div className="mt-3 space-y-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                  <div className="flex items-center gap-2">
+                    <label className="shrink-0 text-xs font-medium text-gray-600">Insert after</label>
+                    <select
+                      value={newStepAfterIndex}
+                      onChange={(e) => setNewStepAfterIndex(Number(e.target.value))}
+                      className="min-w-0 flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    >
+                      {milestonesWithDates.map((m, i) => (
+                        <option key={i} value={i}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={newStepLabel}
+                      onChange={(e) => setNewStepLabel(e.target.value)}
+                      placeholder="Step name — e.g. Alteration, Fitting"
+                      className="min-w-0 flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                    <input
+                      type="date"
+                      value={newStepDate}
+                      onChange={(e) => setNewStepDate(e.target.value)}
+                      className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Inserted right after "{milestonesWithDates[newStepAfterIndex]?.label}", due {newStepDate ? formatShort(newStepDate) : "—"}.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setAddingStep(false)} className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmAddStep}
+                      disabled={!newStepLabel.trim()}
+                      className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Add Step
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={openAddStep}
+                  className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-gray-200 py-2 text-xs font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600"
+                >
+                  <Plus size={14} /> Add Step
+                </button>
+              )}
             </div>
           </div>
 

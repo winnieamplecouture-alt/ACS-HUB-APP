@@ -3,36 +3,45 @@
 // which case the urgent template always wins. Durations are editable in
 // Settings — these are just the starting defaults.
 
+// The standard stage list every design's timeline is built from, in order.
+// Same stages for all three categories — only each stage's day-length
+// differs per category (and is fully editable in Settings).
+const STANDARD_STAGES = [
+  { key: "paid", label: "Paid" },
+  { key: "consultation", label: "Consultation" },
+  { key: "sketch", label: "Sketch Development" },
+  { key: "fabric_sourcing_confirmation", label: "Fabric Sourcing Confirmation" },
+  { key: "fabric_sourcing", label: "Fabric Sourcing" },
+  { key: "fabric_sourcing_confirm", label: "Fabric Sourcing Confirm" },
+  { key: "quotation_review", label: "Quotation Review" },
+  { key: "quotation_confirmed", label: "Quotation Confirmed" },
+  { key: "fabric_arrive", label: "Fabric Arrive" },
+  { key: "production_team", label: "Production Team" },
+  { key: "holiday_check", label: "Holiday Check" },
+  { key: "fitting", label: "Fitting" },
+  { key: "minor_alteration", label: "Minor Alteration" },
+  { key: "completed", label: "Completed" },
+];
+
+function withDefaultDays(days) {
+  return STANDARD_STAGES.map((s, i) => ({ ...s, days: days[i] }));
+}
+
 export const DEFAULT_TIMELINE_TEMPLATES = {
   rtw: {
     label: "Ready-to-Wear",
     hint: "Standard timeline: 35–48 days",
-    stages: [
-      { key: "consultation", label: "Consultation", days: 4 },
-      { key: "sketch", label: "Sketch Development", days: 10 },
-      { key: "production", label: "Production", days: 19 },
-      { key: "hybrid", label: "Hybrid Processing", days: 7 },
-    ],
+    stages: withDefaultDays([1, 3, 5, 2, 5, 2, 2, 2, 5, 10, 1, 2, 3, 1]),
   },
   couture: {
     label: "Couture / High End",
     hint: "Longer production window",
-    stages: [
-      { key: "consultation", label: "Consultation", days: 5 },
-      { key: "sketch", label: "Sketch Development", days: 14 },
-      { key: "production", label: "Production", days: 35 },
-      { key: "hybrid", label: "Hybrid Processing", days: 10 },
-    ],
+    stages: withDefaultDays([1, 5, 10, 3, 10, 3, 3, 3, 7, 20, 2, 4, 5, 1]),
   },
   urgent: {
     label: "Urgent",
     hint: "Rush timeline — overrides RTW/Couture when a design is marked urgent",
-    stages: [
-      { key: "consultation", label: "Consultation", days: 1 },
-      { key: "sketch", label: "Sketch Development", days: 3 },
-      { key: "production", label: "Production", days: 10 },
-      { key: "hybrid", label: "Hybrid Processing", days: 3 },
-    ],
+    stages: withDefaultDays([1, 1, 2, 1, 3, 1, 1, 1, 2, 4, 1, 1, 1, 1]),
   },
 };
 
