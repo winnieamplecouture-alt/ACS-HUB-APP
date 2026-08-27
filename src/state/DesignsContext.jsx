@@ -13,12 +13,43 @@ function genUid() {
   return `uid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+// Seed designs (the 44 that ship with the app) get a deterministic uid tied
+// to their original CDS code, so it stays the same even after a rename —
+// that's what lets us look their bundled photo back up below.
+function baseUid(id) {
+  return `base-${id}`;
+}
+
 // Every design gets its own permanent, never-shown, never-edited uid. The
 // CDS code (`id`) is just an editable label — using it as the delete/update
 // key was the bug where two similar-looking codes could end up referring to
 // (or clobbering) the same record. All mutations below key off uid instead.
 function ensureUids(designs) {
-  return designs.map((d) => (d.uid ? d : { ...d, uid: genUid() }));
+  return designs.map((d) => (d.uid ? d : { ...d, uid: baseUid(d.id) }));
+}
+
+// The 44 seed designs' photos are already embedded as data URIs in the
+// shipped JS bundle (baked in at build time) — re-saving them into
+// localStorage on every edit was blowing the browser's per-origin quota
+// (a few MB of photos, written on every single change), which made saves
+// silently fail. So: strip a design's photo out of what we persist
+// whenever it's still exactly the bundled seed photo, and restore it from
+// this map on load. Only genuinely uploaded/changed photos get persisted.
+const SEED_PHOTO_BY_UID = new Map(BASE_DESIGNS.map((d) => [baseUid(d.id), d.photo]));
+
+function stripSeedPhoto(d) {
+  if (d.photo !== undefined && SEED_PHOTO_BY_UID.get(d.uid) === d.photo) {
+    const { photo: _photo, ...rest } = d;
+    return rest;
+  }
+  return d;
+}
+
+function restoreSeedPhoto(d) {
+  if (d.photo === undefined && SEED_PHOTO_BY_UID.has(d.uid)) {
+    return { ...d, photo: SEED_PHOTO_BY_UID.get(d.uid) };
+  }
+  return d;
 }
 
 // Defensive net: if two designs ever end up with the same CDS code (however
@@ -94,7 +125,8 @@ function loadInitialDesigns() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return dedupeIds(ensureUids(BASE_DESIGNS));
-    return dedupeIds(ensureUids(JSON.parse(raw).map(reviveDesign)));
+    const withUids = ensureUids(JSON.parse(raw));
+    return dedupeIds(withUids.map((d) => reviveDesign(restoreSeedPhoto(d))));
   } catch {
     return dedupeIds(ensureUids(BASE_DESIGNS));
   }
@@ -104,7 +136,7 @@ function loadInitialDeleted() {
   try {
     const raw = localStorage.getItem(DELETED_STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw).map((entry) => ({ ...entry, design: reviveDesign(entry.design) }));
+    return JSON.parse(raw).map((entry) => ({ ...entry, design: reviveDesign(restoreSeedPhoto(entry.design)) }));
   } catch {
     return [];
   }
@@ -125,7 +157,7 @@ export function DesignsProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(designs));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(designs.map(stripSeedPhoto)));
     } catch {
       // storage full or unavailable — edits still work for this session
     }
@@ -133,7 +165,8 @@ export function DesignsProvider({ children }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DELETED_STORAGE_KEY, JSON.stringify(deletedDesigns));
+      const compact = deletedDesigns.map((entry) => ({ ...entry, design: stripSeedPhoto(entry.design) }));
+      localStorage.setItem(DELETED_STORAGE_KEY, JSON.stringify(compact));
     } catch {
       // storage full or unavailable — edits still work for this session
     }
