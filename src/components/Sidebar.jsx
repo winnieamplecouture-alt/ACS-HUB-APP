@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Shirt,
+  Layers,
   Calendar,
   BarChart3,
   Award,
@@ -12,6 +13,7 @@ import {
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/designs", label: "Designs", icon: Shirt },
+  { to: "/batches", label: "Batches", icon: Layers },
   { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/reports", label: "Reports", icon: BarChart3 },
   { to: "/best-practice", label: "Best Practice", icon: Award },

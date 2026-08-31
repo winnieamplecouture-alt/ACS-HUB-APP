@@ -6,6 +6,8 @@ const STORAGE_KEY = "acs-hub-designs-v2";
 const DELETED_STORAGE_KEY = "acs-hub-deleted-designs-v1";
 const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v3";
 const STAFF_STORAGE_KEY = "acs-hub-staff-v1";
+const BATCHES_STORAGE_KEY = "acs-hub-batches-v1";
+const CUSTOMERS_STORAGE_KEY = "acs-hub-customers-v1";
 const RETENTION_DAYS = 30;
 
 function genUid() {
@@ -26,6 +28,13 @@ function baseUid(id) {
 // (or clobbering) the same record. All mutations below key off uid instead.
 function ensureUids(designs) {
   return designs.map((d) => (d.uid ? d : { ...d, uid: baseUid(d.id) }));
+}
+
+// Every design belongs to a batch (manpower-limited intake round). Anything
+// that predates the batch feature — the 44 seed designs included — belongs
+// to Batch 1.
+function ensureBatch(designs) {
+  return designs.map((d) => (d.batch ? d : { ...d, batch: 1 }));
 }
 
 // The 44 seed designs' photos are already embedded as data URIs in the
@@ -99,6 +108,10 @@ function nextDesignId(designs) {
     return n > m ? n : m;
   }, 0);
   return `CDS1.${max + 1}`;
+}
+
+function nextBatchId(batches) {
+  return batches.reduce((m, b) => (b.id > m ? b.id : m), 0) + 1;
 }
 
 function reviveMilestone(m) {
@@ -189,12 +202,32 @@ function migrateToStandardStages(design, templates) {
 function loadInitialDesigns(templates) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return dedupeIds(ensureUids(BASE_DESIGNS));
+    if (!raw) return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS)));
     const withUids = ensureUids(JSON.parse(raw));
-    return dedupeIds(withUids.map((d) => migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates)));
+    return ensureBatch(dedupeIds(withUids.map((d) => migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates))));
   } catch {
-    return dedupeIds(ensureUids(BASE_DESIGNS));
+    return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS)));
   }
+}
+
+function loadInitialBatches() {
+  try {
+    const raw = localStorage.getItem(BATCHES_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fall through to default
+  }
+  return [{ id: 1, name: "Batch 1" }];
+}
+
+function loadInitialCustomers() {
+  try {
+    const raw = localStorage.getItem(CUSTOMERS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // fall through to default
+  }
+  return [];
 }
 
 function loadInitialDeleted(templates) {
@@ -222,6 +255,8 @@ export function DesignsProvider({ children }) {
   const [designs, setDesigns] = useState(() => loadInitialDesigns(templates));
   const [deletedDesigns, setDeletedDesigns] = useState(() => loadInitialDeleted(templates));
   const [staff, setStaff] = useState(loadInitialStaff);
+  const [batches, setBatches] = useState(loadInitialBatches);
+  const [customers, setCustomers] = useState(loadInitialCustomers);
 
   useEffect(() => {
     try {
@@ -255,6 +290,22 @@ export function DesignsProvider({ children }) {
       // storage full or unavailable — edits still work for this session
     }
   }, [staff]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BATCHES_STORAGE_KEY, JSON.stringify(batches));
+    } catch {
+      // storage full or unavailable — edits still work for this session
+    }
+  }, [batches]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CUSTOMERS_STORAGE_KEY, JSON.stringify(customers));
+    } catch {
+      // storage full or unavailable (e.g. a large agreement PDF) — edits still work for this session
+    }
+  }, [customers]);
 
   // Purge anything past the 30-day retention window — checked once when the
   // app opens, which is as close to "automatic" as a backend-less app gets.
@@ -337,11 +388,24 @@ export function DesignsProvider({ children }) {
         );
       },
 
-      addDesign: (customer, { name, category, remark, pic }) => {
+      addDesign: (customer, { name, category, remark, pic, batch }) => {
         let newId;
         setDesigns((prev) => {
           newId = nextDesignId(prev);
-          return [...prev, { uid: genUid(), id: newId, name, customer, pic: pic || null, category: category || "", remark: remark || "", timeline: null }];
+          return [
+            ...prev,
+            {
+              uid: genUid(),
+              id: newId,
+              name,
+              customer,
+              pic: pic || null,
+              category: category || "",
+              remark: remark || "",
+              batch: batch || 1,
+              timeline: null,
+            },
+          ];
         });
         return newId;
       },
@@ -394,8 +458,34 @@ export function DesignsProvider({ children }) {
       removeStaff: (name) => {
         setStaff((prev) => prev.filter((s) => s !== name));
       },
+
+      batches,
+
+      addBatch: (name) => {
+        let created;
+        setBatches((prev) => {
+          const id = nextBatchId(prev);
+          created = { id, name: name?.trim() || `Batch ${id}` };
+          return [...prev, created];
+        });
+        return created;
+      },
+
+      customers,
+
+      getCustomerByName: (name) => customers.find((c) => c.name === name),
+
+      addCustomer: (details) => {
+        const uid = genUid();
+        setCustomers((prev) => [...prev, { uid, createdAt: new Date().toISOString(), ...details }]);
+        return uid;
+      },
+
+      updateCustomer: (uid, patch) => {
+        setCustomers((prev) => prev.map((c) => (c.uid === uid ? { ...c, ...patch } : c)));
+      },
     }),
-    [designs, deletedDesigns, templates, staff]
+    [designs, deletedDesigns, templates, staff, batches, customers]
   );
 
   return <DesignsContext.Provider value={value}>{children}</DesignsContext.Provider>;

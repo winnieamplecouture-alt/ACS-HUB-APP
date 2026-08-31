@@ -47,8 +47,19 @@ function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
 export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getDesign, startTimeline, toggleMilestone, addMilestone, removeMilestone, setDelay, updateDesign, renameDesignId, templateForDesign, staff } =
-    useDesigns();
+  const {
+    getDesign,
+    startTimeline,
+    toggleMilestone,
+    addMilestone,
+    removeMilestone,
+    setDelay,
+    updateDesign,
+    renameDesignId,
+    templateForDesign,
+    staff,
+    batches,
+  } = useDesigns();
   const design = getDesign(id);
 
   const [reason, setReason] = useState(design?.timeline?.delay?.reason ?? DELAY_REASONS[0]);
@@ -299,6 +310,15 @@ export default function DesignDetail() {
                 <option value="">No Category</option>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <select
+                value={design.batch || 1}
+                onChange={(e) => updateDesign(design.uid, { batch: Number(e.target.value) })}
+                className="rounded-full border-0 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
               </select>
               <button

@@ -7,6 +7,7 @@ import Reports from "./pages/Reports";
 import BestPractice from "./pages/BestPractice";
 import Settings from "./pages/Settings";
 import CalendarPage from "./pages/Calendar";
+import Batches from "./pages/Batches";
 import { DesignsProvider } from "./state/DesignsContext";
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/designs" element={<Designs />} />
+            <Route path="/batches" element={<Batches />} />
             <Route path="/designs/:id" element={<DesignDetail />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/best-practice" element={<BestPractice />} />
