@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { BASE_DESIGNS, startDesignTimeline } from "../data/designs";
-import { DEFAULT_TIMELINE_TEMPLATES, stagesToMilestones, templateKeyForDesign } from "../data/timelineTemplates";
+import { DEFAULT_TIMELINE_TEMPLATES, STANDARD_STAGES, stagesToMilestones, templateKeyForDesign } from "../data/timelineTemplates";
 
 const STORAGE_KEY = "acs-hub-designs-v2";
 const DELETED_STORAGE_KEY = "acs-hub-deleted-designs-v1";
-const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v2";
+const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v3";
 const STAFF_STORAGE_KEY = "acs-hub-staff-v1";
 const RETENTION_DAYS = 30;
 
@@ -132,22 +132,79 @@ function reviveDesign(d) {
   };
 }
 
-function loadInitialDesigns() {
+// Old stage names that got renamed or folded into the new standard list —
+// so progress recorded under the old name still lands on the right stage.
+const LEGACY_LABEL_ALIASES = {
+  Production: "Production Team",
+  "Holiday Check": "Quality Check",
+};
+
+// One-time upgrade for a timeline started before the full standard stage
+// list existed (it may only have had e.g. Consultation / Sketch Development
+// / Production / Hybrid Processing). Every stage whose name matches a
+// standard stage (directly or via the alias above) keeps its done/date/note
+// exactly as recorded; every standard stage that's new just gets added,
+// pending. Any old stage that doesn't correspond to a standard one at all
+// is kept as a custom step, inserted where it originally sat in sequence,
+// so nothing already recorded is ever lost.
+function migrateToStandardStages(design, templates) {
+  if (!design.timeline || design.timeline.standardized) return design;
+
+  const template = templates[templateKeyForDesign(design)];
+  const standardMilestones = stagesToMilestones(template.stages);
+  const standardLabels = new Set(STANDARD_STAGES.map((s) => s.label));
+  const oldMilestones = design.timeline.milestones;
+
+  const oldByLabel = new Map();
+  for (const m of oldMilestones) {
+    oldByLabel.set(LEGACY_LABEL_ALIASES[m.label] || m.label, m);
+  }
+
+  const newMilestones = standardMilestones.map((s) => {
+    const old = oldByLabel.get(s.label);
+    return old
+      ? { label: s.label, days: s.days, done: old.done, completedDate: old.completedDate, note: old.note }
+      : { label: s.label, days: s.days, done: false, completedDate: null, note: null };
+  });
+
+  let insertAfter = -1;
+  for (const old of oldMilestones) {
+    const canonical = LEGACY_LABEL_ALIASES[old.label] || old.label;
+    if (standardLabels.has(canonical)) {
+      insertAfter = newMilestones.findIndex((m) => m.label === canonical);
+      continue;
+    }
+    // Only carry an unmatched old stage forward if it actually has recorded
+    // progress — an untouched, never-started legacy stage adds nothing the
+    // new standard list doesn't already cover.
+    if (old.done || old.note || old.completedDate) {
+      newMilestones.splice(insertAfter + 1, 0, { ...old, custom: true });
+      insertAfter += 1;
+    }
+  }
+
+  return { ...design, timeline: { ...design.timeline, milestones: newMilestones, standardized: true } };
+}
+
+function loadInitialDesigns(templates) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return dedupeIds(ensureUids(BASE_DESIGNS));
     const withUids = ensureUids(JSON.parse(raw));
-    return dedupeIds(withUids.map((d) => reviveDesign(restoreSeedPhoto(d))));
+    return dedupeIds(withUids.map((d) => migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates)));
   } catch {
     return dedupeIds(ensureUids(BASE_DESIGNS));
   }
 }
 
-function loadInitialDeleted() {
+function loadInitialDeleted(templates) {
   try {
     const raw = localStorage.getItem(DELETED_STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw).map((entry) => ({ ...entry, design: reviveDesign(restoreSeedPhoto(entry.design)) }));
+    return JSON.parse(raw).map((entry) => ({
+      ...entry,
+      design: migrateToStandardStages(reviveDesign(restoreSeedPhoto(entry.design)), templates),
+    }));
   } catch {
     return [];
   }
@@ -161,9 +218,9 @@ function isExpired(entry) {
 const DesignsContext = createContext(null);
 
 export function DesignsProvider({ children }) {
-  const [designs, setDesigns] = useState(loadInitialDesigns);
-  const [deletedDesigns, setDeletedDesigns] = useState(loadInitialDeleted);
   const [templates, setTemplates] = useState(loadInitialTemplates);
+  const [designs, setDesigns] = useState(() => loadInitialDesigns(templates));
+  const [deletedDesigns, setDeletedDesigns] = useState(() => loadInitialDeleted(templates));
   const [staff, setStaff] = useState(loadInitialStaff);
 
   useEffect(() => {

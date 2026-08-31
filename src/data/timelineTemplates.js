@@ -6,7 +6,7 @@
 // The standard stage list every design's timeline is built from, in order.
 // Same stages for all three categories — only each stage's day-length
 // differs per category (and is fully editable in Settings).
-const STANDARD_STAGES = [
+export const STANDARD_STAGES = [
   { key: "paid", label: "Paid" },
   { key: "consultation", label: "Consultation" },
   { key: "sketch", label: "Sketch Development" },
@@ -17,7 +17,7 @@ const STANDARD_STAGES = [
   { key: "quotation_confirmed", label: "Quotation Confirmed" },
   { key: "fabric_arrive", label: "Fabric Arrive" },
   { key: "production_team", label: "Production Team" },
-  { key: "holiday_check", label: "Holiday Check" },
+  { key: "quality_check", label: "Quality Check" },
   { key: "fitting", label: "Fitting" },
   { key: "minor_alteration", label: "Minor Alteration" },
   { key: "completed", label: "Completed" },

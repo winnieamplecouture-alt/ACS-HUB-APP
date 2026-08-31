@@ -95,6 +95,9 @@ export function startDesignTimeline(startDate = new Date(), milestoneDefs = DESI
     startDate: start,
     milestones: milestoneDefs.map((m) => ({ label: m.label, days: m.days, done: false, completedDate: null, note: null })),
     delay: null,
+    // Already built from the current standard stage list — the one-time
+    // migration in DesignsContext should never touch this timeline again.
+    standardized: true,
   };
 }
 
