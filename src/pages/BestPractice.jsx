@@ -92,7 +92,7 @@ function Column({ title, rows, tone }) {
                 <span className="shrink-0 text-gray-400">{formatShort(milestone.completedDate)}</span>
               </div>
               <p className="mt-1 text-gray-500">{milestone.label} (due {formatShort(milestone.targetDate)})</p>
-              <p className="mt-1 text-gray-700">{milestone.note}</p>
+              <p className="mt-1 whitespace-pre-wrap text-gray-700">{milestone.note}</p>
             </li>
           ))}
         </ul>

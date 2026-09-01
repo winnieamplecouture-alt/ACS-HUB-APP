@@ -112,7 +112,7 @@ export default function DesignDetail() {
 
   function openPending(m, index) {
     setPendingIndex(index);
-    setPendingDate(milestoneDates[index] ?? toISO(new Date()));
+    setPendingDate(m.completedDate ? toISO(m.completedDate) : milestoneDates[index] ?? toISO(new Date()));
     setPendingNote(m.note ?? "");
   }
 
@@ -602,17 +602,26 @@ export default function DesignDetail() {
                           </button>
                         )}
                         {m.done ? (
-                          <input
-                            type="date"
-                            value={dateValue}
-                            max={toISO(new Date())}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              setMilestoneDates((prev) => ({ ...prev, [index]: v }));
-                              toggleMilestone(design.uid, index, true, new Date(v), m.note);
-                            }}
-                            className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                          />
+                          <>
+                            <input
+                              type="date"
+                              value={dateValue}
+                              max={toISO(new Date())}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setMilestoneDates((prev) => ({ ...prev, [index]: v }));
+                                toggleMilestone(design.uid, index, true, new Date(v), m.note);
+                              }}
+                              className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                            <button
+                              onClick={() => openPending(m, index)}
+                              title="Edit best-practice note"
+                              className="shrink-0 text-gray-300 hover:text-gray-600"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </>
                         ) : (
                           <span className="shrink-0 text-xs text-gray-400">Due {formatShort(m.targetDate)}</span>
                         )}
@@ -644,9 +653,9 @@ export default function DesignDetail() {
                           <textarea
                             value={pendingNote}
                             onChange={(e) => setPendingNote(e.target.value)}
-                            placeholder="Best-practice note — why on time, or why overdue? (required)"
-                            rows={2}
-                            className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            placeholder="Best-practice note — why on time, or why overdue? (required). Enter starts a new line."
+                            rows={3}
+                            className="w-full resize-y rounded-md border border-gray-200 px-2 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                           />
                           <div className="flex justify-end gap-2">
                             <button
@@ -660,7 +669,7 @@ export default function DesignDetail() {
                               disabled={!pendingNote.trim()}
                               className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                             >
-                              Mark Done
+                              {m.done ? "Save Changes" : "Mark Done"}
                             </button>
                           </div>
                         </div>
@@ -734,18 +743,24 @@ export default function DesignDetail() {
                 <p className="text-xs text-gray-400">Nothing recorded yet — tick a step to add the first note.</p>
               ) : (
                 <ul className="space-y-3">
-                  {bestPracticeEntries.map((m, i) => {
+                  {bestPracticeEntries.map((m) => {
+                    const index = milestonesWithDates.indexOf(m);
                     const onTime = m.completedDate && m.targetDate && toISO(m.completedDate) <= toISO(m.targetDate);
                     return (
-                      <li key={i} className={`rounded-lg border p-3 text-xs ${onTime ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
+                      <li key={index} className={`rounded-lg border p-3 text-xs ${onTime ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
                         <div className="flex items-center justify-between">
                           <span className={`font-medium ${onTime ? "text-emerald-700" : "text-red-700"}`}>
                             {onTime ? "🟢 Completed in time" : "🔴 Overdue"}
                           </span>
-                          <span className="text-gray-400">{formatShort(m.completedDate)}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400">{formatShort(m.completedDate)}</span>
+                            <button onClick={() => openPending(m, index)} title="Edit note" className="text-gray-400 hover:text-gray-700">
+                              <Pencil size={12} />
+                            </button>
+                          </div>
                         </div>
                         <p className="mt-1 text-gray-500">{m.label} (due {formatShort(m.targetDate)})</p>
-                        <p className="mt-1 text-gray-700">{m.note}</p>
+                        <p className="mt-1 whitespace-pre-wrap text-gray-700">{m.note}</p>
                       </li>
                     );
                   })}

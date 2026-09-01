@@ -4,7 +4,7 @@ import { DEFAULT_TIMELINE_TEMPLATES, STANDARD_STAGES, stagesToMilestones, templa
 
 const STORAGE_KEY = "acs-hub-designs-v2";
 const DELETED_STORAGE_KEY = "acs-hub-deleted-designs-v1";
-const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v3";
+const TEMPLATES_STORAGE_KEY = "acs-hub-timeline-templates-v4";
 const STAFF_STORAGE_KEY = "acs-hub-staff-v1";
 const BATCHES_STORAGE_KEY = "acs-hub-batches-v1";
 const CUSTOMERS_STORAGE_KEY = "acs-hub-customers-v1";
@@ -199,12 +199,47 @@ function migrateToStandardStages(design, templates) {
   return { ...design, timeline: { ...design.timeline, milestones: newMilestones, standardized: true } };
 }
 
+// Ongoing sync (runs every load, not one-time): if the standard stage list
+// gains a new stage after a design already standardized its timeline (e.g.
+// "Technical Sketch" added later), insert it — pending, not done — at the
+// position it belongs in. Every stage already on the timeline, and
+// everything recorded on it, is left exactly as-is; this only ever adds.
+function insertMissingStandardStages(design, templates) {
+  if (!design.timeline) return design;
+
+  const template = templates[templateKeyForDesign(design)];
+  const standardMilestones = stagesToMilestones(template.stages);
+  const existingLabels = new Set(design.timeline.milestones.map((m) => m.label));
+  if (standardMilestones.every((s) => existingLabels.has(s.label))) return design;
+
+  const milestones = [...design.timeline.milestones];
+  standardMilestones.forEach((s, idx) => {
+    if (existingLabels.has(s.label)) return;
+    let insertAt = 0;
+    for (let i = idx - 1; i >= 0; i--) {
+      const pos = milestones.findIndex((m) => m.label === standardMilestones[i].label);
+      if (pos !== -1) {
+        insertAt = pos + 1;
+        break;
+      }
+    }
+    milestones.splice(insertAt, 0, { label: s.label, days: s.days, done: false, completedDate: null, note: null });
+    existingLabels.add(s.label);
+  });
+
+  return { ...design, timeline: { ...design.timeline, milestones } };
+}
+
 function loadInitialDesigns(templates) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS)));
     const withUids = ensureUids(JSON.parse(raw));
-    return ensureBatch(dedupeIds(withUids.map((d) => migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates))));
+    return ensureBatch(
+      dedupeIds(
+        withUids.map((d) => insertMissingStandardStages(migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates), templates))
+      )
+    );
   } catch {
     return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS)));
   }
@@ -236,7 +271,7 @@ function loadInitialDeleted(templates) {
     if (!raw) return [];
     return JSON.parse(raw).map((entry) => ({
       ...entry,
-      design: migrateToStandardStages(reviveDesign(restoreSeedPhoto(entry.design)), templates),
+      design: insertMissingStandardStages(migrateToStandardStages(reviveDesign(restoreSeedPhoto(entry.design)), templates), templates),
     }));
   } catch {
     return [];
