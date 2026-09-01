@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2, Copy } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { CATEGORIES, DELAY_REASONS, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
@@ -48,11 +48,13 @@ export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const {
+    designs,
     getDesign,
     startTimeline,
     toggleMilestone,
     addMilestone,
     removeMilestone,
+    duplicateTimeline,
     setDelay,
     updateDesign,
     renameDesignId,
@@ -83,6 +85,8 @@ export default function DesignDetail() {
   const [customerInput, setCustomerInput] = useState(design?.customer ?? "");
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(design?.name ?? "");
+  const [duplicating, setDuplicating] = useState(false);
+  const [selectedTargets, setSelectedTargets] = useState(new Set());
   const [editingRemark, setEditingRemark] = useState(false);
   const [remarkInput, setRemarkInput] = useState(design?.remark ?? "");
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -105,6 +109,30 @@ export default function DesignDetail() {
   const previewTotalDays = totalDays(previewTemplate.stages);
   const totalDaysForDesign = design.timeline ? totalTimelineDays(design) : previewTotalDays;
   const milestonesWithDates = design.timeline ? withTargetDates(design) : [];
+
+  const otherDesigns = designs
+    .filter((d) => d.uid !== design.uid)
+    .sort((a, b) => {
+      const aSame = a.customer === design.customer ? 0 : 1;
+      const bSame = b.customer === design.customer ? 0 : 1;
+      return aSame - bSame || a.customer.localeCompare(b.customer) || a.id.localeCompare(b.id);
+    });
+  const targetsWithProgress = [...selectedTargets].filter((uid) => designs.find((d) => d.uid === uid)?.timeline).length;
+
+  function toggleTarget(uid, checked) {
+    setSelectedTargets((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(uid);
+      else next.delete(uid);
+      return next;
+    });
+  }
+
+  function confirmDuplicate() {
+    duplicateTimeline(design.uid, [...selectedTargets]);
+    setDuplicating(false);
+    setSelectedTargets(new Set());
+  }
 
   function saveDelay() {
     setDelay(design.uid, { reason, action, pic: delayPic, recoveryDate });
@@ -568,11 +596,72 @@ export default function DesignDetail() {
 
           <div className="space-y-4">
             <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <h2 className="mb-4 text-sm font-semibold text-gray-900">Timeline Progress</h2>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-900">Timeline Progress</h2>
+                <button
+                  onClick={() => setDuplicating((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                >
+                  <Copy size={13} /> Duplicate Progress
+                </button>
+              </div>
               <p className="mb-4 text-xs text-gray-400">
                 Each step's due date is the date you completed the step before it, plus that step's configured days. Tick a step when it's
                 done — you'll be asked for the date and a short best-practice note before it's saved.
               </p>
+
+              {duplicating && (
+                <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                  <p className="mb-2 text-xs font-medium text-gray-700">
+                    Copy this design's whole progress so far onto other designs worked on at the same time:
+                  </p>
+                  <div className="max-h-56 space-y-0.5 overflow-y-auto rounded-md border border-gray-100 bg-white p-1.5">
+                    {otherDesigns.map((d) => (
+                      <label key={d.uid} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedTargets.has(d.uid)}
+                          onChange={(e) => toggleTarget(d.uid, e.target.checked)}
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium text-gray-800">{d.id}</span>{" "}
+                          <span className="text-gray-400">· {d.customer}</span>
+                        </span>
+                        {d.timeline && (
+                          <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            Has progress
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                    {otherDesigns.length === 0 && <p className="px-1.5 py-2 text-xs text-gray-400">No other designs.</p>}
+                  </div>
+                  {targetsWithProgress > 0 && (
+                    <p className="mt-2 text-[11px] text-amber-700">
+                      {targetsWithProgress} selected design{targetsWithProgress === 1 ? "" : "s"} already {targetsWithProgress === 1 ? "has" : "have"} a
+                      timeline — this will overwrite it.
+                    </p>
+                  )}
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setDuplicating(false);
+                        setSelectedTargets(new Set());
+                      }}
+                      className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDuplicate}
+                      disabled={selectedTargets.size === 0}
+                      className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Apply to {selectedTargets.size} Design{selectedTargets.size === 1 ? "" : "s"}
+                    </button>
+                  </div>
+                </div>
+              )}
               <ul className="space-y-3">
                 {milestonesWithDates.map((m, index) => {
                   const dateValue = milestoneDates[index] ?? toISO(m.completedDate ?? new Date());

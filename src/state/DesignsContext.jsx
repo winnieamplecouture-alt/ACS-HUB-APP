@@ -417,6 +417,23 @@ export function DesignsProvider({ children }) {
         );
       },
 
+      // Copies a design's whole timeline — stage list, days, and every
+      // done/date/note recorded so far — onto one or more other designs
+      // that were worked on in parallel with it. Replaces whatever timeline
+      // (if any) those designs already had.
+      duplicateTimeline: (sourceUid, targetUids) => {
+        setDesigns((prev) => {
+          const source = prev.find((d) => d.uid === sourceUid);
+          if (!source?.timeline) return prev;
+          const targetSet = new Set(targetUids);
+          return prev.map((d) =>
+            targetSet.has(d.uid)
+              ? { ...d, timeline: { ...source.timeline, milestones: source.timeline.milestones.map((m) => ({ ...m })), delay: null } }
+              : d
+          );
+        });
+      },
+
       setDelay: (uid, delay) => {
         setDesigns((prev) =>
           prev.map((d) => (d.uid === uid && d.timeline ? { ...d, timeline: { ...d.timeline, delay } } : d))
