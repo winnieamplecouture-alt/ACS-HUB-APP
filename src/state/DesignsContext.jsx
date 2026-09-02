@@ -176,7 +176,7 @@ function migrateToStandardStages(design, templates) {
   const newMilestones = standardMilestones.map((s) => {
     const old = oldByLabel.get(s.label);
     return old
-      ? { label: s.label, days: s.days, done: old.done, completedDate: old.completedDate, note: old.note }
+      ? { label: s.label, days: s.days, done: old.done, completedDate: old.completedDate, note: old.note, category: old.category ?? null }
       : { label: s.label, days: s.days, done: false, completedDate: null, note: null };
   });
 
@@ -378,12 +378,14 @@ export function DesignsProvider({ children }) {
         }));
       },
 
-      toggleMilestone: (uid, index, done, completedDate = new Date(), note = null) => {
+      toggleMilestone: (uid, index, done, completedDate = new Date(), note = null, category = null) => {
         setDesigns((prev) =>
           prev.map((d) => {
             if (d.uid !== uid || !d.timeline) return d;
             const milestones = d.timeline.milestones.map((m, i) =>
-              i === index ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null } : m
+              i === index
+                ? { ...m, done, completedDate: done ? completedDate : null, note: done ? note : null, category: done ? category : null }
+                : m
             );
             return { ...d, timeline: { ...d.timeline, milestones } };
           })

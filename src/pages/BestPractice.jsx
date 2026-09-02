@@ -92,6 +92,11 @@ function Column({ title, rows, tone }) {
                 <span className="shrink-0 text-gray-400">{formatShort(milestone.completedDate)}</span>
               </div>
               <p className="mt-1 text-gray-500">{milestone.label} (due {formatShort(milestone.targetDate)})</p>
+              {milestone.category && (
+                <span className="mt-1 inline-block rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                  {milestone.category}
+                </span>
+              )}
               <p className="mt-1 whitespace-pre-wrap text-gray-700">{milestone.note}</p>
             </li>
           ))}

@@ -28,6 +28,20 @@ export const DESIGN_MILESTONES = [
 
 export const DELAY_REASONS = ["Customer", "Supplier", "Factory", "Internal", "Other"];
 
+// What a best-practice note is actually attributing performance to — picked
+// every time a step is ticked done (on time or overdue), so Reports can
+// show what's driving good performance, not just what's causing delays.
+export const NOTE_CATEGORIES = [
+  "Customer Responsiveness",
+  "Fabric & Material Sourcing",
+  "Team Capacity",
+  "Design Complexity",
+  "Planning & Scheduling",
+  "Communication",
+  "Supplier / Vendor",
+  "Other",
+];
+
 export const CATEGORIES = ["RTW", "High End", "Couture"];
 
 export const PACKAGE_OPTIONS = ["500", "1000", "3000", "5000"];

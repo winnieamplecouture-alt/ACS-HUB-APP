@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2, Copy } from "lucide-react";
 import StatusPill from "../components/StatusPill";
-import { CATEGORIES, DELAY_REASONS, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
+import { CATEGORIES, DELAY_REASONS, NOTE_CATEGORIES, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
 import { useDesigns } from "../state/DesignsContext";
 
@@ -73,6 +73,7 @@ export default function DesignDetail() {
   const [pendingIndex, setPendingIndex] = useState(null);
   const [pendingDate, setPendingDate] = useState("");
   const [pendingNote, setPendingNote] = useState("");
+  const [pendingCategory, setPendingCategory] = useState(NOTE_CATEGORIES[0]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [addingStep, setAddingStep] = useState(false);
   const [newStepLabel, setNewStepLabel] = useState("");
@@ -142,12 +143,13 @@ export default function DesignDetail() {
     setPendingIndex(index);
     setPendingDate(m.completedDate ? toISO(m.completedDate) : milestoneDates[index] ?? toISO(new Date()));
     setPendingNote(m.note ?? "");
+    setPendingCategory(m.category ?? NOTE_CATEGORIES[0]);
   }
 
   function confirmPending(index) {
-    if (!pendingNote.trim()) return;
+    if (!pendingNote.trim() || !pendingCategory) return;
     setMilestoneDates((prev) => ({ ...prev, [index]: pendingDate }));
-    toggleMilestone(design.uid, index, true, new Date(pendingDate), pendingNote.trim());
+    toggleMilestone(design.uid, index, true, new Date(pendingDate), pendingNote.trim(), pendingCategory);
     setPendingIndex(null);
     setPendingNote("");
   }
@@ -699,7 +701,7 @@ export default function DesignDetail() {
                               onChange={(e) => {
                                 const v = e.target.value;
                                 setMilestoneDates((prev) => ({ ...prev, [index]: v }));
-                                toggleMilestone(design.uid, index, true, new Date(v), m.note);
+                                toggleMilestone(design.uid, index, true, new Date(v), m.note, m.category);
                               }}
                               className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                             />
@@ -739,10 +741,26 @@ export default function DesignDetail() {
                           <p className="text-[11px] text-gray-400">
                             Due date was {formatShort(m.targetDate)} ({m.days} day{m.days === 1 ? "" : "s"} after the previous step).
                           </p>
+                          <div>
+                            <label className="mb-1 block text-[11px] font-medium text-gray-600">What's this down to? (required)</label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {NOTE_CATEGORIES.map((c) => (
+                                <button
+                                  key={c}
+                                  onClick={() => setPendingCategory(c)}
+                                  className={`rounded-full border px-2 py-1 text-[11px] font-medium ${
+                                    pendingCategory === c ? "border-blue-400 bg-blue-100 text-blue-800" : "border-gray-200 bg-white text-gray-600"
+                                  }`}
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                           <textarea
                             value={pendingNote}
                             onChange={(e) => setPendingNote(e.target.value)}
-                            placeholder="Best-practice note — why on time, or why overdue? (required). Enter starts a new line."
+                            placeholder="Best-practice note — elaborate on the reason above. Enter starts a new line. (required)"
                             rows={3}
                             className="w-full resize-y rounded-md border border-gray-200 px-2 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                           />
@@ -755,7 +773,7 @@ export default function DesignDetail() {
                             </button>
                             <button
                               onClick={() => confirmPending(index)}
-                              disabled={!pendingNote.trim()}
+                              disabled={!pendingNote.trim() || !pendingCategory}
                               className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {m.done ? "Save Changes" : "Mark Done"}
@@ -849,6 +867,11 @@ export default function DesignDetail() {
                           </div>
                         </div>
                         <p className="mt-1 text-gray-500">{m.label} (due {formatShort(m.targetDate)})</p>
+                        {m.category && (
+                          <span className="mt-1 inline-block rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                            {m.category}
+                          </span>
+                        )}
                         <p className="mt-1 whitespace-pre-wrap text-gray-700">{m.note}</p>
                       </li>
                     );
