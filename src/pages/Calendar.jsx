@@ -20,6 +20,7 @@ const PILL_STYLE = {
 
 function toKey(d) {
   const x = new Date(d);
+  if (isNaN(x.getTime())) return "invalid";
   x.setHours(0, 0, 0, 0);
   return x.toISOString().slice(0, 10);
 }

@@ -6,7 +6,9 @@ import { designStatus, withTargetDates } from "../data/designs";
 import { useDesigns } from "../state/DesignsContext";
 
 function toISO(d) {
-  return new Date(d).toISOString().slice(0, 10);
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 export default function Reports() {

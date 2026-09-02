@@ -7,7 +7,9 @@ import { totalDays } from "../data/timelineTemplates";
 import { useDesigns } from "../state/DesignsContext";
 
 function toISO(d) {
-  return new Date(d).toISOString().slice(0, 10);
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 function formatShort(d) {
@@ -147,7 +149,7 @@ export default function DesignDetail() {
   }
 
   function confirmPending(index) {
-    if (!pendingNote.trim() || !pendingCategory) return;
+    if (!pendingNote.trim() || !pendingCategory || !pendingDate || isNaN(new Date(pendingDate).getTime())) return;
     setMilestoneDates((prev) => ({ ...prev, [index]: pendingDate }));
     toggleMilestone(design.uid, index, true, new Date(pendingDate), pendingNote.trim(), pendingCategory);
     setPendingIndex(null);
@@ -701,6 +703,7 @@ export default function DesignDetail() {
                               onChange={(e) => {
                                 const v = e.target.value;
                                 setMilestoneDates((prev) => ({ ...prev, [index]: v }));
+                                if (!v || isNaN(new Date(v).getTime())) return;
                                 toggleMilestone(design.uid, index, true, new Date(v), m.note, m.category);
                               }}
                               className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -773,7 +776,7 @@ export default function DesignDetail() {
                             </button>
                             <button
                               onClick={() => confirmPending(index)}
-                              disabled={!pendingNote.trim() || !pendingCategory}
+                              disabled={!pendingNote.trim() || !pendingCategory || !pendingDate || isNaN(new Date(pendingDate).getTime())}
                               className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               {m.done ? "Save Changes" : "Mark Done"}
