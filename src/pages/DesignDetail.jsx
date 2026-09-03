@@ -1,0 +1,1161 @@
+import { useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2, Copy, Link2, FileText, ExternalLink } from "lucide-react";
+import StatusPill from "../components/StatusPill";
+import { Detail } from "../components/CustomerForm";
+import { CATEGORIES, DELAY_REASONS, NOTE_CATEGORIES, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
+import { totalDays } from "../data/timelineTemplates";
+import { useDesigns } from "../state/DesignsContext";
+
+function toISO(d) {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function formatShort(d) {
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Could not read image"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+const MAX_QUOTATION_BYTES = 5 * 1024 * 1024;
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+export default function DesignDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const {
+    designs,
+    getDesign,
+    startTimeline,
+    toggleMilestone,
+    addMilestone,
+    removeMilestone,
+    duplicateTimeline,
+    setDelay,
+    updateDesign,
+    approveQuotation,
+    renameDesignId,
+    templateForDesign,
+    staff,
+    batches,
+    getCustomerByName,
+  } = useDesigns();
+  const design = getDesign(id);
+
+  const [reason, setReason] = useState(design?.timeline?.delay?.reason ?? DELAY_REASONS[0]);
+  const [action, setAction] = useState(design?.timeline?.delay?.action ?? "");
+  const [delayPic, setDelayPic] = useState(design?.timeline?.delay?.pic ?? design?.pic ?? "");
+  const [recoveryDate, setRecoveryDate] = useState(design?.timeline?.delay?.recoveryDate ?? "");
+  const [startDateInput, setStartDateInput] = useState(toISO(new Date()));
+  const [milestoneDates, setMilestoneDates] = useState({});
+  const [pendingIndex, setPendingIndex] = useState(null);
+  const [pendingDate, setPendingDate] = useState("");
+  const [pendingNote, setPendingNote] = useState("");
+  const [pendingCategory, setPendingCategory] = useState(NOTE_CATEGORIES[0]);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [addingStep, setAddingStep] = useState(false);
+  const [newStepLabel, setNewStepLabel] = useState("");
+  const [newStepDate, setNewStepDate] = useState(toISO(new Date()));
+  const [newStepAfterIndex, setNewStepAfterIndex] = useState(0);
+  const [editingId, setEditingId] = useState(false);
+  const [idInput, setIdInput] = useState(design?.id ?? "");
+  const [idError, setIdError] = useState("");
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [customerInput, setCustomerInput] = useState(design?.customer ?? "");
+  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(design?.name ?? "");
+  const [duplicating, setDuplicating] = useState(false);
+  const [selectedTargets, setSelectedTargets] = useState(new Set());
+  const [editingRemark, setEditingRemark] = useState(false);
+  const [remarkInput, setRemarkInput] = useState(design?.remark ?? "");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const [editingDeck, setEditingDeck] = useState(false);
+  const [deckInput, setDeckInput] = useState(design?.designDeckLink ?? "");
+  const [editingTechSketch, setEditingTechSketch] = useState(false);
+  const [techSketchInput, setTechSketchInput] = useState(design?.technicalSketchLink ?? "");
+  const [quotationUploading, setQuotationUploading] = useState(false);
+  const [quotationError, setQuotationError] = useState("");
+  const [confirmingApproval, setConfirmingApproval] = useState(false);
+  const quotationInputRef = useRef(null);
+
+  if (!design) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => navigate("/designs")} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800">
+          <ArrowLeft size={16} /> Back to list
+        </button>
+        <p className="text-sm text-gray-500">Design "{id}" was not found.</p>
+      </div>
+    );
+  }
+
+  const status = designStatus(design);
+  const { expected, next } = expectedVsActual(design);
+  const previewTemplate = templateForDesign(design);
+  const previewTotalDays = totalDays(previewTemplate.stages);
+  const totalDaysForDesign = design.timeline ? totalTimelineDays(design) : previewTotalDays;
+  const milestonesWithDates = design.timeline ? withTargetDates(design) : [];
+  const customerProfile = getCustomerByName(design.customer);
+
+  const otherDesigns = designs
+    .filter((d) => d.uid !== design.uid)
+    .sort((a, b) => {
+      const aSame = a.customer === design.customer ? 0 : 1;
+      const bSame = b.customer === design.customer ? 0 : 1;
+      return aSame - bSame || a.customer.localeCompare(b.customer) || a.id.localeCompare(b.id);
+    });
+  const targetsWithProgress = [...selectedTargets].filter((uid) => designs.find((d) => d.uid === uid)?.timeline).length;
+
+  function toggleTarget(uid, checked) {
+    setSelectedTargets((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(uid);
+      else next.delete(uid);
+      return next;
+    });
+  }
+
+  function confirmDuplicate() {
+    duplicateTimeline(design.uid, [...selectedTargets]);
+    setDuplicating(false);
+    setSelectedTargets(new Set());
+  }
+
+  function saveDelay() {
+    setDelay(design.uid, { reason, action, pic: delayPic, recoveryDate });
+  }
+
+  function openPending(m, index) {
+    setPendingIndex(index);
+    setPendingDate(m.completedDate ? toISO(m.completedDate) : milestoneDates[index] ?? toISO(new Date()));
+    setPendingNote(m.note ?? "");
+    setPendingCategory(m.category ?? NOTE_CATEGORIES[0]);
+  }
+
+  function confirmPending(index) {
+    if (!pendingNote.trim() || !pendingCategory || !pendingDate || isNaN(new Date(pendingDate).getTime())) return;
+    setMilestoneDates((prev) => ({ ...prev, [index]: pendingDate }));
+    toggleMilestone(design.uid, index, true, new Date(pendingDate), pendingNote.trim(), pendingCategory);
+    setPendingIndex(null);
+    setPendingNote("");
+  }
+
+  function openAddStep() {
+    setNewStepLabel("");
+    setNewStepDate(toISO(new Date()));
+    setNewStepAfterIndex(milestonesWithDates.length - 1);
+    setAddingStep(true);
+  }
+
+  function confirmAddStep() {
+    if (!newStepLabel.trim()) return;
+    const anchorMilestone = milestonesWithDates[newStepAfterIndex];
+    const anchor = anchorMilestone
+      ? anchorMilestone.done && anchorMilestone.completedDate
+        ? anchorMilestone.completedDate
+        : anchorMilestone.targetDate
+      : design.timeline.startDate;
+    const days = Math.max(0, Math.round((new Date(newStepDate) - new Date(anchor)) / 86400000));
+    addMilestone(design.uid, { label: newStepLabel.trim(), days, afterIndex: newStepAfterIndex });
+    setMilestoneDates({});
+    setPendingIndex(null);
+    setAddingStep(false);
+  }
+
+  function removeStep(index) {
+    removeMilestone(design.uid, index);
+    setMilestoneDates({});
+    setPendingIndex(null);
+  }
+
+  function startEditId() {
+    setIdInput(design.id);
+    setIdError("");
+    setEditingId(true);
+  }
+
+  function saveId() {
+    const trimmed = idInput.trim();
+    if (!trimmed || trimmed === design.id) {
+      setEditingId(false);
+      return;
+    }
+    const result = renameDesignId(design.uid, trimmed);
+    if (!result.ok) {
+      setIdError(result.error ?? "Couldn't rename.");
+      return;
+    }
+    setEditingId(false);
+    navigate(`/designs/${trimmed}`, { replace: true });
+  }
+
+  function startEditCustomer() {
+    setCustomerInput(design.customer);
+    setEditingCustomer(true);
+  }
+
+  function saveCustomer() {
+    if (customerInput.trim()) {
+      updateDesign(design.uid, { customer: customerInput.trim() });
+    }
+    setEditingCustomer(false);
+  }
+
+  function startEditName() {
+    setNameInput(design.name);
+    setEditingName(true);
+  }
+
+  function saveName() {
+    if (nameInput.trim()) {
+      updateDesign(design.uid, { name: nameInput.trim() });
+    }
+    setEditingName(false);
+  }
+
+  function startEditRemark() {
+    setRemarkInput(design.remark ?? "");
+    setEditingRemark(true);
+  }
+
+  function saveRemark() {
+    updateDesign(design.uid, { remark: remarkInput.trim() });
+    setEditingRemark(false);
+  }
+
+  async function handlePhotoFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      updateDesign(design.uid, { photo: dataUrl });
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
+  function startEditDeck() {
+    setDeckInput(design.designDeckLink ?? "");
+    setEditingDeck(true);
+  }
+
+  function saveDeck() {
+    updateDesign(design.uid, { designDeckLink: deckInput.trim() });
+    setEditingDeck(false);
+  }
+
+  function startEditTechSketch() {
+    setTechSketchInput(design.technicalSketchLink ?? "");
+    setEditingTechSketch(true);
+  }
+
+  function saveTechSketch() {
+    updateDesign(design.uid, { technicalSketchLink: techSketchInput.trim() });
+    setEditingTechSketch(false);
+  }
+
+  async function handleQuotationFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_QUOTATION_BYTES) {
+      setQuotationError("That file is over 5MB — please upload a smaller PDF.");
+      return;
+    }
+    setQuotationError("");
+    setQuotationUploading(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      updateDesign(design.uid, { quotation: { fileName: file.name, fileType: file.type, dataUrl } });
+    } finally {
+      setQuotationUploading(false);
+    }
+  }
+
+  const bestPracticeEntries = milestonesWithDates.filter((m) => m.done && m.note);
+
+  return (
+    <div className="space-y-5">
+      <button onClick={() => navigate("/designs")} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-800">
+        <ArrowLeft size={16} /> Back to list
+      </button>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {design.photo ? (
+            <button onClick={() => setLightboxOpen(true)} className="shrink-0">
+              <img src={design.photo} alt={design.name} className="h-16 w-16 rounded-xl border border-gray-200 object-cover transition hover:opacity-80" />
+            </button>
+          ) : (
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-200 text-gray-300">
+              <Shirt size={22} />
+            </span>
+          )}
+          <div>
+            {editingId ? (
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-semibold text-gray-900">Design</span>
+                  <input
+                    autoFocus
+                    value={idInput}
+                    onChange={(e) => {
+                      setIdInput(e.target.value);
+                      setIdError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveId();
+                      if (e.key === "Escape") setEditingId(false);
+                    }}
+                    className="rounded-lg border border-gray-300 px-2 py-0.5 text-2xl font-semibold text-gray-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <button onClick={saveId} className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingId(false)} className="rounded-md px-2.5 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+                {idError && <p className="mt-1 text-xs text-red-600">{idError}</p>}
+              </div>
+            ) : (
+              <h1 className="group flex items-center gap-1.5 text-2xl font-semibold text-gray-900">
+                Design {design.id}
+                <button onClick={startEditId} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={14} />
+                </button>
+              </h1>
+            )}
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+              {editingName ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveName();
+                      if (e.key === "Escape") setEditingName(false);
+                    }}
+                    className="rounded-md border border-gray-300 px-2 py-0.5 text-sm text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                  <button onClick={saveName} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingName(false)} className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <span className="group inline-flex items-center gap-1.5">
+                  {design.name}
+                  <button onClick={startEditName} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                    <Pencil size={12} />
+                  </button>
+                </span>
+              )}
+              <select
+                value={design.category ?? ""}
+                onChange={(e) => updateDesign(design.uid, { category: e.target.value })}
+                className="rounded-full border-0 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="">No Category</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <select
+                value={design.batch || 1}
+                onChange={(e) => updateDesign(design.uid, { batch: Number(e.target.value) })}
+                className="rounded-full border-0 bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              >
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => updateDesign(design.uid, { urgent: !design.urgent })}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition ${
+                  design.urgent ? "bg-red-100 text-red-700" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                }`}
+              >
+                <Zap size={11} />
+                {design.urgent ? "Urgent" : "Mark Urgent"}
+              </button>
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <StatusPill status={status} />
+          <span className="text-sm font-medium text-gray-500">
+            {status.currentDay ? `Day ${status.currentDay} / ${totalDaysForDesign}` : "Not started"}
+          </span>
+        </div>
+      </div>
+
+      {lightboxOpen && design.photo && (
+        <div
+          onClick={() => setLightboxOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8"
+        >
+          <button onClick={() => setLightboxOpen(false)} className="absolute right-6 top-6 text-white/80 hover:text-white">
+            <X size={28} />
+          </button>
+          <img src={design.photo} alt={design.name} className="max-h-full max-w-3xl rounded-lg object-contain" />
+        </div>
+      )}
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+          <div>
+            <dt className="text-xs text-gray-400">Customer</dt>
+            {editingCustomer ? (
+              <div className="mt-0.5 flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={customerInput}
+                  onChange={(e) => setCustomerInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveCustomer();
+                    if (e.key === "Escape") setEditingCustomer(false);
+                  }}
+                  className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm font-medium text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <button onClick={saveCustomer} className="shrink-0 rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                  Save
+                </button>
+                <button onClick={() => setEditingCustomer(false)} className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <dd className="group mt-0.5 flex items-center gap-1.5 font-medium text-gray-800">
+                {design.customer}
+                <button onClick={startEditCustomer} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </dd>
+            )}
+            <p className="mt-1 text-[11px] text-gray-400">Wrong customer? Edit here and it moves to the right group in the Designs list.</p>
+            {customerProfile && (
+              <button
+                onClick={() => setShowCustomerDetails((v) => !v)}
+                className="mt-1 text-[11px] font-medium text-blue-600 hover:underline"
+              >
+                {showCustomerDetails ? "Hide Customer Details" : "Customer Details"}
+              </button>
+            )}
+          </div>
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <User size={14} />
+              PIC
+            </dt>
+            <select
+              value={design.pic ?? ""}
+              onChange={(e) => updateDesign(design.uid, { pic: e.target.value || null })}
+              className="mt-0.5 -ml-1 rounded-md border-0 bg-transparent px-1 py-0.5 font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">Unassigned</option>
+              {staff.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+              {design.pic && !staff.includes(design.pic) && <option value={design.pic}>{design.pic}</option>}
+            </select>
+          </div>
+          <div>
+            <dt className="text-xs text-gray-400">Remark</dt>
+            {editingRemark ? (
+              <div className="mt-0.5 flex items-start gap-2">
+                <textarea
+                  autoFocus
+                  rows={2}
+                  value={remarkInput}
+                  onChange={(e) => setRemarkInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setEditingRemark(false);
+                  }}
+                  className="w-full min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button onClick={saveRemark} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingRemark(false)} className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <dd className="group mt-0.5 flex items-start gap-1.5 font-medium text-gray-800">
+                <span>{design.remark || <span className="font-normal text-gray-400">No remark</span>}</span>
+                <button onClick={startEditRemark} className="shrink-0 text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </dd>
+            )}
+          </div>
+        </dl>
+
+        {showCustomerDetails && customerProfile && (
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:grid-cols-4">
+              <Detail label="Order ID" value={customerProfile.orderId} />
+              <Detail label="Contact No." value={customerProfile.phone} />
+              <Detail label="Email" value={customerProfile.email} />
+              <Detail label="Package" value={customerProfile.package && `RM${customerProfile.package}`} />
+              <Detail label="Package Value" value={customerProfile.packageValue} />
+              <Detail label="Package Type & Qty" value={customerProfile.packageTypeQty} />
+              <Detail label="Est. Completion" value={customerProfile.estimatedCompletionDate} />
+              <Detail label="Special Requests" value={customerProfile.specialRequests} full />
+              {customerProfile.agreement && (
+                <div className="col-span-full">
+                  <dt className="text-gray-400">Agreement</dt>
+                  <dd className="mt-0.5 inline-flex items-center gap-1 font-medium text-gray-700">
+                    <FileText size={12} /> {customerProfile.agreement.fileName}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-3 text-[11px] text-gray-400">
+              To edit {design.customer}'s details, go to the Designs list and click into her name.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="mb-1 text-sm font-semibold text-gray-900">Documents</h2>
+        <p className="mb-4 text-xs text-gray-400">Design deck, technical sketch, and the quotation the customer needs to approve.</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <Link2 size={12} /> Design Deck
+            </dt>
+            {editingDeck ? (
+              <div className="mt-1 space-y-1.5">
+                <input
+                  autoFocus
+                  value={deckInput}
+                  onChange={(e) => setDeckInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveDeck();
+                    if (e.key === "Escape") setEditingDeck(false);
+                  }}
+                  placeholder="Canva view-only link"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex gap-1.5">
+                  <button onClick={saveDeck} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingDeck(false)} className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : design.designDeckLink ? (
+              <div className="group mt-1 flex items-center gap-1.5">
+                <a
+                  href={design.designDeckLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Open Deck <ExternalLink size={12} />
+                </a>
+                <button onClick={startEditDeck} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={startEditDeck} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline">
+                <Plus size={12} /> Add Link
+              </button>
+            )}
+          </div>
+
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <Link2 size={12} /> Technical Sketch
+            </dt>
+            {editingTechSketch ? (
+              <div className="mt-1 space-y-1.5">
+                <input
+                  autoFocus
+                  value={techSketchInput}
+                  onChange={(e) => setTechSketchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTechSketch();
+                    if (e.key === "Escape") setEditingTechSketch(false);
+                  }}
+                  placeholder="Excel (fabric + sewing details) link"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex gap-1.5">
+                  <button onClick={saveTechSketch} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingTechSketch(false)}
+                    className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : design.technicalSketchLink ? (
+              <div className="group mt-1 flex items-center gap-1.5">
+                <a
+                  href={design.technicalSketchLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Open Sheet <ExternalLink size={12} />
+                </a>
+                <button onClick={startEditTechSketch} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={startEditTechSketch} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline">
+                <Plus size={12} /> Add Link
+              </button>
+            )}
+          </div>
+
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <FileText size={12} /> Quotation
+            </dt>
+            <div className="mt-1">
+              {design.quotation ? (
+                <a
+                  href={design.quotation.dataUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 truncate text-sm font-medium text-blue-600 hover:underline"
+                >
+                  {design.quotation.fileName} <ExternalLink size={12} className="shrink-0" />
+                </a>
+              ) : (
+                <p className="text-xs text-gray-400">No quotation uploaded yet.</p>
+              )}
+              <input ref={quotationInputRef} type="file" accept="application/pdf" onChange={handleQuotationFile} className="hidden" />
+              <button
+                onClick={() => quotationInputRef.current?.click()}
+                disabled={quotationUploading}
+                className="mt-1 flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+              >
+                <Upload size={12} /> {quotationUploading ? "Uploading…" : design.quotation ? "Replace PDF" : "Upload PDF"}
+              </button>
+              {quotationError && <p className="mt-1 text-xs text-red-600">{quotationError}</p>}
+            </div>
+
+            <div className="mt-3">
+              {design.quotationApproved ? (
+                <div className="rounded-lg bg-emerald-600 px-3 py-2 text-center text-xs font-semibold text-white">
+                  ✓ Customer Approved
+                  {design.quotationApprovedAt && (
+                    <div className="mt-0.5 text-[10px] font-normal text-emerald-100">{formatShort(design.quotationApprovedAt)}</div>
+                  )}
+                </div>
+              ) : confirmingApproval ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
+                  <p className="text-xs text-emerald-800">This is permanent and can't be undone. Confirm?</p>
+                  <div className="mt-1.5 flex gap-1.5">
+                    <button
+                      onClick={() => setConfirmingApproval(false)}
+                      className="flex-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        approveQuotation(design.uid);
+                        setConfirmingApproval(false);
+                      }}
+                      className="flex-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingApproval(true)}
+                  disabled={!design.quotation}
+                  title={design.quotation ? "" : "Upload the quotation PDF first"}
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Mark Customer Approved
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="relative w-full shrink-0 lg:w-[220px]">
+          {design.photo ? (
+            <button onClick={() => setLightboxOpen(true)} className="block h-full min-h-[300px] w-full overflow-hidden rounded-xl border border-gray-200 bg-white">
+              <img src={design.photo} alt={design.name} className="h-full w-full object-cover object-top transition hover:opacity-80" />
+            </button>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-full min-h-[300px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-white text-gray-300 hover:border-gray-300 hover:text-gray-400"
+            >
+              <Shirt size={32} />
+              <span className="text-xs font-medium">Upload Photo</span>
+            </button>
+          )}
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoFile} className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={photoUploading}
+            className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-white/90 px-2 py-1 text-xs font-medium text-gray-700 shadow hover:bg-white disabled:opacity-50"
+          >
+            <Upload size={12} /> {photoUploading ? "Uploading…" : design.photo ? "Change" : "Upload"}
+          </button>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          {!design.timeline ? (
+            <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center">
+              <p className="text-sm text-gray-500">This design hasn't started its timeline yet.</p>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
+                It'll follow the <span className="font-medium text-gray-600">{previewTemplate.label}</span> timeline ({previewTotalDays} days) —{" "}
+                {design.urgent ? "marked Urgent above." : "change its Category, or mark it Urgent above, to use a different one."} Edit stage durations
+                in Settings.
+              </p>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
+                If work already started earlier, set the real start date — Day 1 and every target date will be calculated from it.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <input
+                  type="date"
+                  value={startDateInput}
+                  onChange={(e) => setStartDateInput(e.target.value)}
+                  max={toISO(new Date())}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <button
+                  onClick={() => startTimeline(design.uid, new Date(startDateInput))}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Start {previewTotalDays}-Day Timeline
+                </button>
+              </div>
+            </div>
+          ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr_280px]">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h2 className="mb-3 text-sm font-semibold text-gray-900">Expected Today</h2>
+              <p className="text-sm text-gray-700">
+                {expected ? `${expected.done ? "✔" : "○"} ${expected.label}` : "—"}
+              </p>
+              <h2 className="mb-3 mt-4 text-sm font-semibold text-gray-900">Actual</h2>
+              <p className="text-sm text-gray-700">
+                {expected ? (expected.done ? `✔ ${expected.label}` : "Not done yet") : "—"}
+              </p>
+              <h2 className="mb-3 mt-4 text-sm font-semibold text-gray-900">Next Target</h2>
+              <p className="text-sm text-gray-700">
+                {next ? `${next.label} · Due ${formatShort(next.targetDate)}` : "All milestones complete"}
+              </p>
+            </div>
+
+            {status.key === "behind" && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-5">
+                <h2 className="mb-4 text-sm font-semibold text-red-800">Behind Schedule</h2>
+                <div className="space-y-4">
+                  <div>
+                    <p className="mb-1.5 text-sm font-medium text-gray-700">Why?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {DELAY_REASONS.map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => setReason(r)}
+                          className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                            reason === r ? "border-red-400 bg-red-100 text-red-800" : "border-gray-200 bg-white text-gray-600"
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">Action</label>
+                    <input
+                      value={action}
+                      onChange={(e) => setAction(e.target.value)}
+                      placeholder="What are we doing about it?"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">PIC</label>
+                    <input
+                      value={delayPic}
+                      onChange={(e) => setDelayPic(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">Expected Recovery Date</label>
+                    <input
+                      type="date"
+                      value={recoveryDate}
+                      onChange={(e) => setRecoveryDate(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <button
+                    onClick={saveDelay}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-900">Timeline Progress</h2>
+                <button
+                  onClick={() => setDuplicating((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline"
+                >
+                  <Copy size={13} /> Duplicate Progress
+                </button>
+              </div>
+              <p className="mb-4 text-xs text-gray-400">
+                Each step's due date is the date you completed the step before it, plus that step's configured days. Tick a step when it's
+                done — you'll be asked for the date and a short best-practice note before it's saved.
+              </p>
+
+              {duplicating && (
+                <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                  <p className="mb-2 text-xs font-medium text-gray-700">
+                    Copy this design's whole progress so far onto other designs worked on at the same time:
+                  </p>
+                  <div className="max-h-56 space-y-0.5 overflow-y-auto rounded-md border border-gray-100 bg-white p-1.5">
+                    {otherDesigns.map((d) => (
+                      <label key={d.uid} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedTargets.has(d.uid)}
+                          onChange={(e) => toggleTarget(d.uid, e.target.checked)}
+                        />
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium text-gray-800">{d.id}</span>{" "}
+                          <span className="text-gray-400">· {d.customer}</span>
+                        </span>
+                        {d.timeline && (
+                          <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            Has progress
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                    {otherDesigns.length === 0 && <p className="px-1.5 py-2 text-xs text-gray-400">No other designs.</p>}
+                  </div>
+                  {targetsWithProgress > 0 && (
+                    <p className="mt-2 text-[11px] text-amber-700">
+                      {targetsWithProgress} selected design{targetsWithProgress === 1 ? "" : "s"} already {targetsWithProgress === 1 ? "has" : "have"} a
+                      timeline — this will overwrite it.
+                    </p>
+                  )}
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setDuplicating(false);
+                        setSelectedTargets(new Set());
+                      }}
+                      className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDuplicate}
+                      disabled={selectedTargets.size === 0}
+                      className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Apply to {selectedTargets.size} Design{selectedTargets.size === 1 ? "" : "s"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <ul className="space-y-3">
+                {milestonesWithDates.map((m, index) => {
+                  const dateValue = milestoneDates[index] ?? toISO(m.completedDate ?? new Date());
+                  const isPending = pendingIndex === index;
+                  return (
+                    <li key={index}>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => (m.done ? toggleMilestone(design.uid, index, false) : openPending(m, index))}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                            m.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-gray-300 bg-white hover:border-gray-400"
+                          }`}
+                        >
+                          {m.done && <Check size={13} />}
+                        </button>
+                        <span className={`flex flex-1 items-center gap-1.5 text-sm ${m.done ? "text-gray-900" : "text-gray-600"}`}>
+                          {m.label}
+                          {m.custom && <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Custom</span>}
+                        </span>
+                        {m.custom && !m.done && (
+                          <button
+                            onClick={() => removeStep(index)}
+                            title="Remove this step"
+                            className="shrink-0 text-gray-300 hover:text-red-500"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                        {m.done ? (
+                          <>
+                            <input
+                              type="date"
+                              value={dateValue}
+                              max={toISO(new Date())}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setMilestoneDates((prev) => ({ ...prev, [index]: v }));
+                                if (!v || isNaN(new Date(v).getTime())) return;
+                                toggleMilestone(design.uid, index, true, new Date(v), m.note, m.category);
+                              }}
+                              className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs text-emerald-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                            <button
+                              onClick={() => openPending(m, index)}
+                              title="Edit best-practice note"
+                              className="shrink-0 text-gray-300 hover:text-gray-600"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="shrink-0 text-xs text-gray-400">Due {formatShort(m.targetDate)}</span>
+                        )}
+                      </div>
+                      {isPending && (
+                        <div className="ml-8 mt-2 space-y-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-medium text-gray-600">Date completed</label>
+                            <input
+                              type="date"
+                              value={pendingDate}
+                              max={toISO(new Date())}
+                              onChange={(e) => setPendingDate(e.target.value)}
+                              className="rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                            <span
+                              className={`ml-auto rounded-full px-2 py-0.5 text-xs font-medium ${
+                                pendingDate && pendingDate <= toISO(m.targetDate)
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {pendingDate && pendingDate <= toISO(m.targetDate) ? "🟢 On time" : "🔴 Overdue"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-400">
+                            Due date was {formatShort(m.targetDate)} ({m.days} day{m.days === 1 ? "" : "s"} after the previous step).
+                          </p>
+                          <div>
+                            <label className="mb-1 block text-[11px] font-medium text-gray-600">What's this down to? (required)</label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {NOTE_CATEGORIES.map((c) => (
+                                <button
+                                  key={c}
+                                  onClick={() => setPendingCategory(c)}
+                                  className={`rounded-full border px-2 py-1 text-[11px] font-medium ${
+                                    pendingCategory === c ? "border-blue-400 bg-blue-100 text-blue-800" : "border-gray-200 bg-white text-gray-600"
+                                  }`}
+                                >
+                                  {c}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <textarea
+                            value={pendingNote}
+                            onChange={(e) => setPendingNote(e.target.value)}
+                            placeholder="Best-practice note — elaborate on the reason above. Enter starts a new line. (required)"
+                            rows={3}
+                            className="w-full resize-y rounded-md border border-gray-200 px-2 py-1.5 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => setPendingIndex(null)}
+                              className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => confirmPending(index)}
+                              disabled={!pendingNote.trim() || !pendingCategory || !pendingDate || isNaN(new Date(pendingDate).getTime())}
+                              className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              {m.done ? "Save Changes" : "Mark Done"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {addingStep ? (
+                <div className="mt-3 space-y-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                  <div className="flex items-center gap-2">
+                    <label className="shrink-0 text-xs font-medium text-gray-600">Insert after</label>
+                    <select
+                      value={newStepAfterIndex}
+                      onChange={(e) => setNewStepAfterIndex(Number(e.target.value))}
+                      className="min-w-0 flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    >
+                      {milestonesWithDates.map((m, i) => (
+                        <option key={i} value={i}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      value={newStepLabel}
+                      onChange={(e) => setNewStepLabel(e.target.value)}
+                      placeholder="Step name — e.g. Alteration, Fitting"
+                      className="min-w-0 flex-1 rounded-md border border-gray-200 px-2 py-1 text-xs placeholder:text-gray-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                    <input
+                      type="date"
+                      value={newStepDate}
+                      onChange={(e) => setNewStepDate(e.target.value)}
+                      className="shrink-0 rounded-md border border-gray-200 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Inserted right after "{milestonesWithDates[newStepAfterIndex]?.label}", due {newStepDate ? formatShort(newStepDate) : "—"}.
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setAddingStep(false)} className="rounded-md px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmAddStep}
+                      disabled={!newStepLabel.trim()}
+                      className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Add Step
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={openAddStep}
+                  className="mt-3 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-gray-200 py-2 text-xs font-medium text-gray-400 hover:border-gray-300 hover:text-gray-600"
+                >
+                  <Plus size={14} /> Add Step
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="rounded-xl border border-gray-200 bg-white p-5">
+              <h2 className="mb-1 text-sm font-semibold text-gray-900">Best Practice</h2>
+              <p className="mb-4 text-xs text-gray-400">Compulsory note captured each time a step is ticked done.</p>
+              {bestPracticeEntries.length === 0 ? (
+                <p className="text-xs text-gray-400">Nothing recorded yet — tick a step to add the first note.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {bestPracticeEntries.map((m) => {
+                    const index = milestonesWithDates.indexOf(m);
+                    const onTime = m.completedDate && m.targetDate && toISO(m.completedDate) <= toISO(m.targetDate);
+                    return (
+                      <li key={index} className={`rounded-lg border p-3 text-xs ${onTime ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50"}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`font-medium ${onTime ? "text-emerald-700" : "text-red-700"}`}>
+                            {onTime ? "🟢 Completed in time" : "🔴 Overdue"}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-400">{formatShort(m.completedDate)}</span>
+                            <button onClick={() => openPending(m, index)} title="Edit note" className="text-gray-400 hover:text-gray-700">
+                              <Pencil size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="mt-1 text-gray-500">{m.label} (due {formatShort(m.targetDate)})</p>
+                        {m.category && (
+                          <span className="mt-1 inline-block rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                            {m.category}
+                          </span>
+                        )}
+                        <p className="mt-1 whitespace-pre-wrap text-gray-700">{m.note}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
