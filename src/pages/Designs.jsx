@@ -212,22 +212,6 @@ export default function Designs() {
         />
       )}
 
-      {editingDetailsFor && (
-        <CustomerForm
-          title={`Customer Details — ${editingDetailsFor}`}
-          form={customerForm}
-          setForm={setCustomerForm}
-          batches={batches}
-          showBatch={false}
-          nameLocked
-          fileError={customerFileError}
-          onFile={handleCustomerFile}
-          onCancel={() => setEditingDetailsFor(null)}
-          onSubmit={submitEditDetails}
-          submitLabel="Save Details"
-        />
-      )}
-
       {showDeleted ? (
         <div className="rounded-xl border border-gray-200 bg-white">
           <div className="border-b border-gray-100 bg-gray-50/60 px-5 py-3">
@@ -348,6 +332,24 @@ export default function Designs() {
                 <Plus size={14} /> Add Design
               </button>
             </div>
+
+            {editingDetailsFor === customer && (
+              <div className="border-b border-gray-100">
+                <CustomerForm
+                  title={`Customer Details — ${customer}`}
+                  form={customerForm}
+                  setForm={setCustomerForm}
+                  batches={batches}
+                  showBatch={false}
+                  nameLocked
+                  fileError={customerFileError}
+                  onFile={handleCustomerFile}
+                  onCancel={() => setEditingDetailsFor(null)}
+                  onSubmit={submitEditDetails}
+                  submitLabel="Save Details"
+                />
+              </div>
+            )}
 
             {detailsFor === customer && profile && (
               <div className="border-b border-gray-100 bg-gray-50/40 px-5 py-4">
