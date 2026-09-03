@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { BASE_DESIGNS, startDesignTimeline } from "../data/designs";
+import { BASE_DESIGNS, DESIGN_DECK_LINKS_BY_CUSTOMER, TECHNICAL_SKETCH_LINKS_BY_CUSTOMER, startDesignTimeline } from "../data/designs";
 import { DEFAULT_TIMELINE_TEMPLATES, STANDARD_STAGES, stagesToMilestones, templateKeyForDesign } from "../data/timelineTemplates";
 
 const STORAGE_KEY = "acs-hub-designs-v2";
@@ -230,18 +230,35 @@ function insertMissingStandardStages(design, templates) {
   return { ...design, timeline: { ...design.timeline, milestones } };
 }
 
+// Ongoing sync (runs every load, not one-time): fills in a design's Canva
+// deck / technical sketch link from the known-customer directory above, but
+// only when that field is still blank — a link already set (by the seed
+// data, or typed in by hand) is never touched or overwritten.
+function applyKnownLinks(design) {
+  const patch = {};
+  if (!design.designDeckLink && DESIGN_DECK_LINKS_BY_CUSTOMER[design.customer]) {
+    patch.designDeckLink = DESIGN_DECK_LINKS_BY_CUSTOMER[design.customer];
+  }
+  if (!design.technicalSketchLink && TECHNICAL_SKETCH_LINKS_BY_CUSTOMER[design.customer]) {
+    patch.technicalSketchLink = TECHNICAL_SKETCH_LINKS_BY_CUSTOMER[design.customer];
+  }
+  return Object.keys(patch).length ? { ...design, ...patch } : design;
+}
+
 function loadInitialDesigns(templates) {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS)));
+    if (!raw) return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS))).map(applyKnownLinks);
     const withUids = ensureUids(JSON.parse(raw));
     return ensureBatch(
       dedupeIds(
-        withUids.map((d) => insertMissingStandardStages(migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates), templates))
+        withUids.map((d) =>
+          applyKnownLinks(insertMissingStandardStages(migrateToStandardStages(reviveDesign(restoreSeedPhoto(d)), templates), templates))
+        )
       )
     );
   } catch {
-    return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS)));
+    return ensureBatch(dedupeIds(ensureUids(BASE_DESIGNS))).map(applyKnownLinks);
   }
 }
 
@@ -448,7 +465,7 @@ export function DesignsProvider({ children }) {
           newId = nextDesignId(prev);
           return [
             ...prev,
-            {
+            applyKnownLinks({
               uid: genUid(),
               id: newId,
               name,
@@ -458,7 +475,7 @@ export function DesignsProvider({ children }) {
               remark: remark || "",
               batch: batch || 1,
               timeline: null,
-            },
+            }),
           ];
         });
         return newId;

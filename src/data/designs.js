@@ -46,6 +46,43 @@ export const CATEGORIES = ["RTW", "High End", "Couture"];
 
 export const PACKAGE_OPTIONS = ["500", "1000", "3000", "5000"];
 
+// Each customer's Canva design deck (view-only presentation of all her
+// sketches) and Excel technical sketch (fabric + sewing details), provided
+// 2026-09-03. Keyed by customer name as it appears on her designs; a couple
+// of customers have two name spellings/variants in use, so both are listed
+// pointing at the same link. These get applied automatically to every
+// design of that customer that doesn't already have its own link set — see
+// applyKnownLinks in DesignsContext.jsx.
+export const DESIGN_DECK_LINKS_BY_CUSTOMER = {
+  "Lau Yoke Foong": "https://canva.link/bwikambinlaaw3e",
+  "Ngaw Yin Yin": "https://www.canva.com/design/DAHMtWuUrc4/Xy6kxmNYlqrNqz6U3niY9A/edit",
+  "Eileen Chong": "https://canva.link/0wkhpenh3ts5bx4",
+  "Eileen Choong": "https://canva.link/0wkhpenh3ts5bx4",
+  "Jacqueline Lim Sweet Chuen": "https://www.canva.com/design/DAHMPbbcl9E/DOMNPMDJO9W_0rfF0c8PAQ/edit",
+  "Chrissie Mulyani Tamara": "https://www.canva.com/design/DAHMtS1HBqo/BsmPf-VYSkUc-Hq5BRicWg/edit",
+  "Gigi Lee Daphne Tai": "https://canva.link/nypz0m4h4gteuwf",
+  "Gigi Lee": "https://canva.link/nypz0m4h4gteuwf",
+  Daisy: "https://canva.link/41p0flmym1sz51m",
+  Triny: "https://canva.link/48b2nuot4gzivid",
+  MS: "https://www.canva.com/design/DAHMtVtxTSU/yznEnwRXYd7mf4CnzSf2PA/edit",
+  Cheryl: "https://canva.link/pyt7fdukgylqphm",
+};
+
+export const TECHNICAL_SKETCH_LINKS_BY_CUSTOMER = {
+  "Lau Yoke Foong": "https://docs.google.com/spreadsheets/d/1hiDAneOYCQVI_A3LgzdFi4m_TUQeYp4_mR_U-gBGIgA/edit?usp=sharing",
+  "Ngaw Yin Yin": "https://docs.google.com/spreadsheets/d/1DmeJFK0eXOJrTbrA2k3IfIXMxD9k4G7CYkDWaeRZrKA/edit?usp=sharing",
+  "Eileen Chong": "https://docs.google.com/spreadsheets/d/1BJRGoqQ2rkkkT1Pd7BfHrVpsA9JI9BtgXbw6jVea24E/edit?usp=sharing",
+  "Eileen Choong": "https://docs.google.com/spreadsheets/d/1BJRGoqQ2rkkkT1Pd7BfHrVpsA9JI9BtgXbw6jVea24E/edit?usp=sharing",
+  "Jacqueline Lim Sweet Chuen": "https://docs.google.com/spreadsheets/d/16KUuCPNDzVHzwqW6VUCpfJkF5QTSvKGKwhJTeCcRDP4/edit?usp=sharing",
+  "Chrissie Mulyani Tamara": "https://docs.google.com/spreadsheets/d/1sgOLiLYk-A2feElj9cPSQ1G5sm0bWCVsT2Je5tXQjeI/edit?usp=sharing",
+  "Gigi Lee Daphne Tai": "https://docs.google.com/spreadsheets/d/12sF0qQtVFEss7mgBveho__5LxrvHNcl-BsbInTr2PhQ/edit?usp=sharing",
+  "Gigi Lee": "https://docs.google.com/spreadsheets/d/12sF0qQtVFEss7mgBveho__5LxrvHNcl-BsbInTr2PhQ/edit?usp=sharing",
+  Daisy: "https://docs.google.com/spreadsheets/d/1ZH-AH8dpYPPB-mHnANQxu9BDjzWiFkLNu0CM5yRlW10/edit?usp=sharing",
+  Triny: "https://docs.google.com/spreadsheets/d/1plHSWenUl-qLtYnCYVICiz8FZLUvjDtoe_pcad8deVI/edit?usp=sharing",
+  MS: "https://docs.google.com/spreadsheets/d/1o3gcTYn7Jxt8x_wSp934bN-xnsNy40XtTSnMan7vs78/edit?usp=sharing",
+  Cheryl: "https://docs.google.com/spreadsheets/d/1ijqLSx_QyzXCPq3tN4IfEWHIitmNCG3OUmnRnMWtGOM/edit?usp=sharing",
+};
+
 export const BASE_DESIGNS = [
   { id: "CDS1.1", photo: "/design-photos/CDS1.1.jpg", name: "Butterfly Gown 2-Piece Set (Top+Skirt)", customer: "Lau Yoke Foong", pic: "Winnie", category: "High End", remark: "Fabric sourcing china (order china)", timeline: null },
   { id: "CDS1.2", photo: "/design-photos/CDS1.2.jpg", name: "Elegant Halter 2-Piece Set (Top+Pants)", customer: "Lau Yoke Foong", pic: "Winnie", category: "RTW", remark: "Fabric sourcing", timeline: null },
