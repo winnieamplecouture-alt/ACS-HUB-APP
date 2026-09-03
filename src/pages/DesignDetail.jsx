@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2, Copy } from "lucide-react";
+import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2, Copy, Link2, FileText, ExternalLink } from "lucide-react";
 import StatusPill from "../components/StatusPill";
 import { CATEGORIES, DELAY_REASONS, NOTE_CATEGORIES, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
@@ -46,6 +46,17 @@ function resizeImageToDataUrl(file, maxDim = 900, quality = 0.85) {
   });
 }
 
+const MAX_QUOTATION_BYTES = 5 * 1024 * 1024;
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function DesignDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -59,6 +70,7 @@ export default function DesignDetail() {
     duplicateTimeline,
     setDelay,
     updateDesign,
+    approveQuotation,
     renameDesignId,
     templateForDesign,
     staff,
@@ -94,6 +106,14 @@ export default function DesignDetail() {
   const [remarkInput, setRemarkInput] = useState(design?.remark ?? "");
   const [photoUploading, setPhotoUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const [editingDeck, setEditingDeck] = useState(false);
+  const [deckInput, setDeckInput] = useState(design?.designDeckLink ?? "");
+  const [editingTechSketch, setEditingTechSketch] = useState(false);
+  const [techSketchInput, setTechSketchInput] = useState(design?.technicalSketchLink ?? "");
+  const [quotationUploading, setQuotationUploading] = useState(false);
+  const [quotationError, setQuotationError] = useState("");
+  const [confirmingApproval, setConfirmingApproval] = useState(false);
+  const quotationInputRef = useRef(null);
 
   if (!design) {
     return (
@@ -249,6 +269,44 @@ export default function DesignDetail() {
       updateDesign(design.uid, { photo: dataUrl });
     } finally {
       setPhotoUploading(false);
+    }
+  }
+
+  function startEditDeck() {
+    setDeckInput(design.designDeckLink ?? "");
+    setEditingDeck(true);
+  }
+
+  function saveDeck() {
+    updateDesign(design.uid, { designDeckLink: deckInput.trim() });
+    setEditingDeck(false);
+  }
+
+  function startEditTechSketch() {
+    setTechSketchInput(design.technicalSketchLink ?? "");
+    setEditingTechSketch(true);
+  }
+
+  function saveTechSketch() {
+    updateDesign(design.uid, { technicalSketchLink: techSketchInput.trim() });
+    setEditingTechSketch(false);
+  }
+
+  async function handleQuotationFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_QUOTATION_BYTES) {
+      setQuotationError("That file is over 5MB — please upload a smaller PDF.");
+      return;
+    }
+    setQuotationError("");
+    setQuotationUploading(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      updateDesign(design.uid, { quotation: { fileName: file.name, fileType: file.type, dataUrl } });
+    } finally {
+      setQuotationUploading(false);
     }
   }
 
@@ -468,6 +526,179 @@ export default function DesignDetail() {
             )}
           </div>
         </dl>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="mb-1 text-sm font-semibold text-gray-900">Documents</h2>
+        <p className="mb-4 text-xs text-gray-400">Design deck, technical sketch, and the quotation the customer needs to approve.</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <Link2 size={12} /> Design Deck
+            </dt>
+            {editingDeck ? (
+              <div className="mt-1 space-y-1.5">
+                <input
+                  autoFocus
+                  value={deckInput}
+                  onChange={(e) => setDeckInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveDeck();
+                    if (e.key === "Escape") setEditingDeck(false);
+                  }}
+                  placeholder="Canva view-only link"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex gap-1.5">
+                  <button onClick={saveDeck} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button onClick={() => setEditingDeck(false)} className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : design.designDeckLink ? (
+              <div className="group mt-1 flex items-center gap-1.5">
+                <a
+                  href={design.designDeckLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Open Deck <ExternalLink size={12} />
+                </a>
+                <button onClick={startEditDeck} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={startEditDeck} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline">
+                <Plus size={12} /> Add Link
+              </button>
+            )}
+          </div>
+
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <Link2 size={12} /> Technical Sketch
+            </dt>
+            {editingTechSketch ? (
+              <div className="mt-1 space-y-1.5">
+                <input
+                  autoFocus
+                  value={techSketchInput}
+                  onChange={(e) => setTechSketchInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTechSketch();
+                    if (e.key === "Escape") setEditingTechSketch(false);
+                  }}
+                  placeholder="Excel (fabric + sewing details) link"
+                  className="w-full rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex gap-1.5">
+                  <button onClick={saveTechSketch} className="rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white hover:bg-blue-700">
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingTechSketch(false)}
+                    className="rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : design.technicalSketchLink ? (
+              <div className="group mt-1 flex items-center gap-1.5">
+                <a
+                  href={design.technicalSketchLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Open Sheet <ExternalLink size={12} />
+                </a>
+                <button onClick={startEditTechSketch} className="text-gray-300 opacity-0 transition group-hover:opacity-100 hover:text-gray-600">
+                  <Pencil size={12} />
+                </button>
+              </div>
+            ) : (
+              <button onClick={startEditTechSketch} className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline">
+                <Plus size={12} /> Add Link
+              </button>
+            )}
+          </div>
+
+          <div>
+            <dt className="flex items-center gap-1 text-xs text-gray-400">
+              <FileText size={12} /> Quotation
+            </dt>
+            <div className="mt-1">
+              {design.quotation ? (
+                <a
+                  href={design.quotation.dataUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 truncate text-sm font-medium text-blue-600 hover:underline"
+                >
+                  {design.quotation.fileName} <ExternalLink size={12} className="shrink-0" />
+                </a>
+              ) : (
+                <p className="text-xs text-gray-400">No quotation uploaded yet.</p>
+              )}
+              <input ref={quotationInputRef} type="file" accept="application/pdf" onChange={handleQuotationFile} className="hidden" />
+              <button
+                onClick={() => quotationInputRef.current?.click()}
+                disabled={quotationUploading}
+                className="mt-1 flex items-center gap-1 text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+              >
+                <Upload size={12} /> {quotationUploading ? "Uploading…" : design.quotation ? "Replace PDF" : "Upload PDF"}
+              </button>
+              {quotationError && <p className="mt-1 text-xs text-red-600">{quotationError}</p>}
+            </div>
+
+            <div className="mt-3">
+              {design.quotationApproved ? (
+                <div className="rounded-lg bg-emerald-600 px-3 py-2 text-center text-xs font-semibold text-white">
+                  ✓ Customer Approved
+                  {design.quotationApprovedAt && (
+                    <div className="mt-0.5 text-[10px] font-normal text-emerald-100">{formatShort(design.quotationApprovedAt)}</div>
+                  )}
+                </div>
+              ) : confirmingApproval ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
+                  <p className="text-xs text-emerald-800">This is permanent and can't be undone. Confirm?</p>
+                  <div className="mt-1.5 flex gap-1.5">
+                    <button
+                      onClick={() => setConfirmingApproval(false)}
+                      className="flex-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        approveQuotation(design.uid);
+                        setConfirmingApproval(false);
+                      }}
+                      className="flex-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingApproval(true)}
+                  disabled={!design.quotation}
+                  title={design.quotation ? "" : "Upload the quotation PDF first"}
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Mark Customer Approved
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">

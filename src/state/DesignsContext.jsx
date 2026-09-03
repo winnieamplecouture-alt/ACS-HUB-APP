@@ -465,7 +465,28 @@ export function DesignsProvider({ children }) {
       },
 
       updateDesign: (uid, patch) => {
-        setDesigns((prev) => prev.map((d) => (d.uid === uid ? { ...d, ...patch } : d)));
+        setDesigns((prev) =>
+          prev.map((d) => {
+            if (d.uid !== uid) return d;
+            const merged = { ...d, ...patch };
+            // Customer approval is a one-way flag — once set, nothing can ever unset it again.
+            if (d.quotationApproved) merged.quotationApproved = true;
+            return merged;
+          })
+        );
+      },
+
+      // The only way quotationApproved is ever set to true. There is deliberately
+      // no counterpart to un-set it — once a customer approves a quotation,
+      // that record is permanent, including against admin edits.
+      approveQuotation: (uid) => {
+        setDesigns((prev) =>
+          prev.map((d) =>
+            d.uid === uid && !d.quotationApproved
+              ? { ...d, quotationApproved: true, quotationApprovedAt: new Date().toISOString() }
+              : d
+          )
+        );
       },
 
       renameDesignId: (uid, newId) => {
