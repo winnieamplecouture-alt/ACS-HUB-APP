@@ -525,6 +525,22 @@ export function DesignsProvider({ children }) {
         return created;
       },
 
+      renameBatch: (id, name) => {
+        const trimmed = name.trim();
+        if (!trimmed) return { ok: false, error: "Batch name can't be empty." };
+        setBatches((prev) => prev.map((b) => (b.id === id ? { ...b, name: trimmed } : b)));
+        return { ok: true };
+      },
+
+      deleteBatch: (id) => {
+        if (batches.length <= 1) return { ok: false, error: "You need at least one batch." };
+        if (designs.some((d) => (d.batch || 1) === id)) {
+          return { ok: false, error: "This batch still has designs in it — move or delete them first." };
+        }
+        setBatches((prev) => prev.filter((b) => b.id !== id));
+        return { ok: true };
+      },
+
       customers,
 
       getCustomerByName: (name) => customers.find((c) => c.name === name),
