@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, User, Check, Shirt, X, Pencil, Upload, Zap, Plus, Trash2, Copy, Link2, FileText, ExternalLink } from "lucide-react";
 import StatusPill from "../components/StatusPill";
+import { Detail } from "../components/CustomerForm";
 import { CATEGORIES, DELAY_REASONS, NOTE_CATEGORIES, designStatus, expectedVsActual, withTargetDates, totalTimelineDays } from "../data/designs";
 import { totalDays } from "../data/timelineTemplates";
 import { useDesigns } from "../state/DesignsContext";
@@ -75,6 +76,7 @@ export default function DesignDetail() {
     templateForDesign,
     staff,
     batches,
+    getCustomerByName,
   } = useDesigns();
   const design = getDesign(id);
 
@@ -98,6 +100,7 @@ export default function DesignDetail() {
   const [idError, setIdError] = useState("");
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [customerInput, setCustomerInput] = useState(design?.customer ?? "");
+  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(design?.name ?? "");
   const [duplicating, setDuplicating] = useState(false);
@@ -132,6 +135,7 @@ export default function DesignDetail() {
   const previewTotalDays = totalDays(previewTemplate.stages);
   const totalDaysForDesign = design.timeline ? totalTimelineDays(design) : previewTotalDays;
   const milestonesWithDates = design.timeline ? withTargetDates(design) : [];
+  const customerProfile = getCustomerByName(design.customer);
 
   const otherDesigns = designs
     .filter((d) => d.uid !== design.uid)
@@ -475,6 +479,14 @@ export default function DesignDetail() {
               </dd>
             )}
             <p className="mt-1 text-[11px] text-gray-400">Wrong customer? Edit here and it moves to the right group in the Designs list.</p>
+            {customerProfile && (
+              <button
+                onClick={() => setShowCustomerDetails((v) => !v)}
+                className="mt-1 text-[11px] font-medium text-blue-600 hover:underline"
+              >
+                {showCustomerDetails ? "Hide Customer Details" : "Customer Details"}
+              </button>
+            )}
           </div>
           <div>
             <dt className="flex items-center gap-1 text-xs text-gray-400">
@@ -526,6 +538,32 @@ export default function DesignDetail() {
             )}
           </div>
         </dl>
+
+        {showCustomerDetails && customerProfile && (
+          <div className="mt-4 border-t border-gray-100 pt-4">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:grid-cols-4">
+              <Detail label="Order ID" value={customerProfile.orderId} />
+              <Detail label="Contact No." value={customerProfile.phone} />
+              <Detail label="Email" value={customerProfile.email} />
+              <Detail label="Package" value={customerProfile.package && `RM${customerProfile.package}`} />
+              <Detail label="Package Value" value={customerProfile.packageValue} />
+              <Detail label="Package Type & Qty" value={customerProfile.packageTypeQty} />
+              <Detail label="Est. Completion" value={customerProfile.estimatedCompletionDate} />
+              <Detail label="Special Requests" value={customerProfile.specialRequests} full />
+              {customerProfile.agreement && (
+                <div className="col-span-full">
+                  <dt className="text-gray-400">Agreement</dt>
+                  <dd className="mt-0.5 inline-flex items-center gap-1 font-medium text-gray-700">
+                    <FileText size={12} /> {customerProfile.agreement.fileName}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-3 text-[11px] text-gray-400">
+              To edit {design.customer}'s details, go to the Designs list and click into her name.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-5">
